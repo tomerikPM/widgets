@@ -1030,7 +1030,7 @@
       <label>Til</label>
       <div class="addr-wrap">
         <input id="to-inp" class="meta-input" type="text"
-               placeholder="F.eks. Porsgrunn stasjon"
+               placeholder="F.eks. Storgata 153, Porsgrunn"
                autocomplete="off" spellcheck="false">
         <ul class="suggestions" id="to-sug"></ul>
       </div>
@@ -1506,26 +1506,125 @@ new MutationObserver(syncTheme).observe(
 syncTheme();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GEOCODING
+// GEOCODING — lokalt søk i forhåndsbygget Grenland-adressedatasett
+// (Kartverket / Geonorge, hentet via scripts/build-grenland-addresses.py)
 // ─────────────────────────────────────────────────────────────────────────────
 let fromCoord = null, toCoord = null;
 const timers = {};
 
-async function nominatim(q) {
-  const p = new URLSearchParams({ q, format:'json', limit:'5', countrycodes:'no', addressdetails:'1', viewbox:'9.30,59.05,9.95,59.38', bounded:'0' });
-  return (await fetch(`https://nominatim.openstreetmap.org/search?${p}`)).json();
+const ADDRESSES_URL = 'https://tomerikpm.github.io/widgets/data/grenland-adresser.json';
+const ADDRESSES_CACHE_KEY = 'pm-grenland-adresser-v1';
+let ADDRESSES = null;
+let addressLoadPromise = null;
+
+function loadAddresses() {
+  if (ADDRESSES) return Promise.resolve(ADDRESSES);
+  if (addressLoadPromise) return addressLoadPromise;
+
+  try {
+    const cached = localStorage.getItem(ADDRESSES_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.version === 1 && parsed.gater) {
+        ADDRESSES = parsed;
+        return Promise.resolve(ADDRESSES);
+      }
+    }
+  } catch {}
+
+  addressLoadPromise = fetch(ADDRESSES_URL)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(data => {
+      ADDRESSES = data;
+      try { localStorage.setItem(ADDRESSES_CACHE_KEY, JSON.stringify(data)); } catch {}
+      return data;
+    });
+  return addressLoadPromise;
 }
 
-// Bygg etikett fra strukturerte felt: "Gate nr, Kommune" eller "POI-navn, Kommune"
-function shortLabel(r) {
-  const a = r.address || {};
-  const street = a.road || a.pedestrian || a.footway || a.path || '';
-  const num    = a.house_number || '';
-  const primary = r.name
-    || (street ? (num ? `${street} ${num}` : street) : '')
-    || (r.display_name || '').split(',')[0].trim();
-  const muni = a.city || a.town || a.village || a.municipality || '';
-  return [primary, muni].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ');
+function normalize(s) {
+  return (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Søker i ADDRESSES.gater. Query-format: "Storgata", "Storgata 12", "Storgata 12B, Skien"
+function searchAddresses(query, limit = 6) {
+  if (!ADDRESSES) return [];
+  const q = normalize(query);
+  if (!q) return [];
+
+  // Trekk ut nummer + ev. bokstav. Tåler både "Storgata 12", "Storgata 12B",
+  // "Storgata 12, Skien" og "Storgata 12 Skien" (kommune til slutt forkastes).
+  // Bokstav-suffiks må stå rett etter tallet uten mellomrom for å skilles fra
+  // kommune-navn ("12 porsgrunn" → ingen bokstav, ikke "p").
+  const m = q.match(/^(.+?)\s+(\d+)([a-zæøå])?(?:\s|,|$)/);
+  let streetQ, numQ, letterQ;
+  if (m) {
+    streetQ = m[1].replace(/[,]/g, '').trim();
+    numQ    = parseInt(m[2], 10);
+    letterQ = m[3] || '';
+  } else {
+    // Ingen nummer — strip ev. komma og bruk hele teksten som gate-søk
+    streetQ = q.replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim();
+    numQ    = null;
+    letterQ = '';
+  }
+
+  // Skåre hver gate-nøkkel mot søketekst
+  const candidates = [];
+  for (const key in ADDRESSES.gater) {
+    const keyNorm = normalize(key);
+    let score = 0;
+    if (keyNorm.startsWith(streetQ))             score = 100;
+    else if (keyNorm.includes(' ' + streetQ))    score = 70;
+    else if (keyNorm.includes(streetQ))          score = 50;
+    else {
+      const words = streetQ.split(' ').filter(Boolean);
+      if (words.length > 1 && words.every(w => keyNorm.includes(w))) score = 25;
+    }
+    if (score > 0) candidates.push({ key, score });
+  }
+  candidates.sort((a, b) => b.score - a.score || a.key.length - b.key.length);
+
+  const results = [];
+  for (const { key } of candidates) {
+    if (results.length >= limit) break;
+    const houses = ADDRESSES.gater[key];
+    const [streetName, place] = key.split(',').map(s => s.trim());
+
+    if (numQ !== null) {
+      // Eksakt nummer-match først
+      const exact = houses.find(h =>
+        h[0] === numQ && (!letterQ || (h[1] || '').toLowerCase() === letterQ)
+      );
+      if (exact) {
+        results.push({
+          label: `${streetName} ${exact[0]}${exact[1] || ''}, ${place}`,
+          lat: exact[2], lng: exact[3]
+        });
+        continue;
+      }
+      // Hvis ikke eksakt: nærmeste lavere/like nummer
+      const nearest = houses.reduce((best, h) => {
+        if (h[0] > numQ) return best;
+        if (!best || h[0] > best[0]) return h;
+        return best;
+      }, null);
+      if (nearest) {
+        results.push({
+          label: `${streetName} ${nearest[0]}${nearest[1] || ''}, ${place} (nærmeste)`,
+          lat: nearest[2], lng: nearest[3]
+        });
+        continue;
+      }
+    }
+    // Uten nummer: vis gate-grupperingen
+    const first = houses[0];
+    results.push({
+      label: `${streetName}, ${place}`,
+      lat: first[2], lng: first[3]
+    });
+  }
+  return results;
 }
 
 function setupAC(inpId, sugId, onPick) {
@@ -1549,31 +1648,36 @@ function setupAC(inpId, sugId, onPick) {
     activeIdx = -1;
   }
 
+  // Last adressedatasettet ved første fokus (lazy)
+  inp.addEventListener('focus', () => { loadAddresses().catch(() => {}); }, { once: true });
+
   inp.addEventListener('input', () => {
     if (inpId === 'from-inp') fromCoord = null; else toCoord = null;
     clearTimeout(timers[inpId]);
     const v = inp.value.trim();
-    if (v.length < 3) { close(); return; }
+    if (v.length < 2) { close(); return; }
+    // Søker er lokalt — kjør med lett debounce kun for å la brukeren skrive ferdig
     timers[inpId] = setTimeout(async () => {
       try {
-        const rs = await nominatim(v);
+        await loadAddresses();
+        const rs = searchAddresses(v, 6);
         sug.innerHTML = '';
         activeIdx = -1;
         if (!rs.length) { sug.style.display = 'none'; return; }
         rs.forEach(r => {
           const li = document.createElement('li');
-          li.textContent = shortLabel(r);
+          li.textContent = r.label;
           li.addEventListener('mouseenter', () => setActive(items().indexOf(li)));
           li.onclick = () => {
-            inp.value = li.textContent;
+            inp.value = r.label;
             close();
-            onPick({ lat: +r.lat, lng: +r.lon });
+            onPick({ lat: r.lat, lng: r.lng });
           };
           sug.appendChild(li);
         });
         sug.style.display = 'block';
       } catch {}
-    }, 380);
+    }, 80);
   });
 
   inp.addEventListener('keydown', (e) => {
@@ -2036,12 +2140,13 @@ async function calculate() {
 
   let from = fromCoord, to = toCoord;
   try {
-    if (!from && fromTxt.length >= 3) { const r = await nominatim(fromTxt); if (r.length) from = fromCoord = { lat:+r[0].lat, lng:+r[0].lon }; }
-    if (!to   && toTxt.length >= 3)   { const r = await nominatim(toTxt);   if (r.length) to   = toCoord   = { lat:+r[0].lat, lng:+r[0].lon }; }
+    await loadAddresses();
+    if (!from && fromTxt.length >= 2) { const r = searchAddresses(fromTxt, 1); if (r.length) from = fromCoord = { lat: r[0].lat, lng: r[0].lng }; }
+    if (!to   && toTxt.length >= 2)   { const r = searchAddresses(toTxt,   1); if (r.length) to   = toCoord   = { lat: r[0].lat, lng: r[0].lng }; }
   } catch {}
 
   if (!from || !to) {
-    errEl.textContent = 'Fyll inn gyldige adresser for start og destinasjon.';
+    errEl.textContent = 'Fant ingen adresse i Grenland (Skien, Porsgrunn, Bamble, Siljan) som matcher. Prøv å velge fra listen som dukker opp under feltet.';
     errEl.style.display = 'block';
     return;
   }
