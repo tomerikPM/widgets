@@ -227,18 +227,13 @@
       color: var(--pm-primary-on);
     }
 
-    /* Route connector arrow */
+    /* Route connector with swap button */
     .route-connector {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 0 14px;
-      color: var(--pm-gray);
-      font-size: 11px;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin: -6px 0;
+      margin: -4px 0;
     }
     .route-connector::before,
     .route-connector::after {
@@ -247,6 +242,29 @@
       height: 1px;
       background: var(--pm-line);
     }
+    .swap-btn {
+      width: 32px; height: 32px;
+      border: 1px solid var(--pm-line);
+      border-radius: 999px;
+      background: var(--pm-absolute);
+      color: var(--pm-gray-dark);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color var(--motion-fast) var(--ease-standard),
+                  color        var(--motion-fast) var(--ease-standard),
+                  background   var(--motion-fast) var(--ease-standard),
+                  transform    var(--motion-medium) var(--ease-standard);
+    }
+    .swap-btn:hover {
+      border-color: var(--pm-primary-on);
+      color: var(--pm-primary-on);
+      background: var(--pm-bright);
+    }
+    .swap-btn:active {
+      transform: rotate(180deg);
+      transition-duration: 220ms;
+    }
+    .swap-btn svg { width: 14px; height: 14px; display: block; }
 
     /* PM .meta-select */
     .meta-select {
@@ -812,7 +830,16 @@
       </div>
     </div>
 
-    <div class="route-connector">via</div>
+    <div class="route-connector">
+      <button type="button" class="swap-btn" onclick="swapAddresses()" aria-label="Bytt om Fra og Til">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="17 1 21 5 17 9"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <polyline points="7 23 3 19 7 15"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+      </button>
+    </div>
 
     <div class="field">
       <label>Til</label>
@@ -848,7 +875,7 @@
         <button class="meta-toggle-pill is-on" id="tog-roundtrip" onclick="togglePill(this, 'roundTrip')">
           Tur / retur
         </button>
-        <button class="meta-toggle-pill" id="tog-autopass" onclick="togglePill(this, 'autopass')">
+        <button class="meta-toggle-pill is-on" id="tog-autopass" onclick="togglePill(this, 'autopass')">
           AutoPASS-rabatt
         </button>
       </div>
@@ -959,7 +986,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // TOGGLE STATE
 // ─────────────────────────────────────────────────────────────────────────────
-const state = { weekday: true, autopass: false, roundTrip: true };
+const state = { weekday: true, autopass: true, roundTrip: true };
 let lastResult  = null;   // alt som trengs for re-render uten ny rute-fetch
 let daysPerWeek = 5;
 
@@ -1134,11 +1161,21 @@ let fromCoord = null, toCoord = null;
 const timers = {};
 
 async function nominatim(q) {
-  const p = new URLSearchParams({ q, format:'json', limit:'5', countrycodes:'no', viewbox:'9.30,59.05,9.95,59.38', bounded:'0' });
+  const p = new URLSearchParams({ q, format:'json', limit:'5', countrycodes:'no', addressdetails:'1', viewbox:'9.30,59.05,9.95,59.38', bounded:'0' });
   return (await fetch(`https://nominatim.openstreetmap.org/search?${p}`)).json();
 }
 
-function shortLabel(dn) { return dn.split(',').slice(0, 4).join(', ').trim(); }
+// Bygg etikett fra strukturerte felt: "Gate nr, Kommune" eller "POI-navn, Kommune"
+function shortLabel(r) {
+  const a = r.address || {};
+  const street = a.road || a.pedestrian || a.footway || a.path || '';
+  const num    = a.house_number || '';
+  const primary = r.name
+    || (street ? (num ? `${street} ${num}` : street) : '')
+    || (r.display_name || '').split(',')[0].trim();
+  const muni = a.city || a.town || a.village || a.municipality || '';
+  return [primary, muni].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ');
+}
 
 function setupAC(inpId, sugId, onPick) {
   const inp = document.getElementById(inpId);
@@ -1174,7 +1211,7 @@ function setupAC(inpId, sugId, onPick) {
         if (!rs.length) { sug.style.display = 'none'; return; }
         rs.forEach(r => {
           const li = document.createElement('li');
-          li.textContent = shortLabel(r.display_name);
+          li.textContent = shortLabel(r);
           li.addEventListener('mouseenter', () => setActive(items().indexOf(li)));
           li.onclick = () => {
             inp.value = li.textContent;
@@ -1205,6 +1242,14 @@ function setupAC(inpId, sugId, onPick) {
 
 setupAC('from-inp', 'from-sug', c => { fromCoord = c; });
 setupAC('to-inp',   'to-sug',   c => { toCoord   = c; });
+
+function swapAddresses() {
+  const fromInp = document.getElementById('from-inp');
+  const toInp   = document.getElementById('to-inp');
+  [fromInp.value, toInp.value]   = [toInp.value, fromInp.value];
+  [fromCoord, toCoord]           = [toCoord, fromCoord];
+  if (lastResult) calculate();
+}
 
 // Live re-render når kjøretøy/tid endres (ingen ny OSRM-fetch nødvendig)
 function reRender(field, value) {
