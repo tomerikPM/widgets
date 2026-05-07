@@ -519,6 +519,43 @@
     .diff-text   { font-size: 12.5px; line-height: 1.5; }
     .diff-text strong { font-weight: 700; }
 
+    /* Alternativ rute callout (sitter mellom kart og resultater) */
+    .alt-route {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 13px;
+      margin: 14px 24px 0;
+      border-radius: var(--square-border);
+      background: var(--pm-primary-light);
+      border: 1px solid color-mix(in srgb, var(--pm-primary-on) 25%, transparent);
+      color: var(--pm-primary-on);
+      font-size: 12.5px;
+      line-height: 1.45;
+      flex-wrap: wrap;
+    }
+    .alt-route-text { flex: 1; min-width: 200px; }
+    .alt-route-text strong { font-weight: 700; }
+    .alt-route-btn {
+      background: var(--pm-primary-on);
+      color: var(--vd-hvit);
+      border: none;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      white-space: nowrap;
+      transition: background var(--motion-fast) var(--ease-standard),
+                  transform  var(--motion-base) var(--ease-standard);
+      flex-shrink: 0;
+    }
+    .alt-route-btn:hover  { background: color-mix(in srgb, var(--pm-primary-on) 80%, black); }
+    .alt-route-btn:active { transform: scale(0.95); transition-duration: 60ms; }
+
     /* Station list */
     .station-list {
       list-style: none;
@@ -792,10 +829,22 @@
 
     /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
     @media (max-width: 440px) {
+      .w-header       { padding: 16px 18px 14px; }
       .w-header h1    { font-size: 16.5px; }
+      .w-body         { padding: 16px 18px; gap: 12px; }
       .opts-row       { grid-template-columns: 1fr; }
+      #map            { height: 240px; }
+      .w-results      { padding: 16px 18px 18px; gap: 12px; }
       .price-grid     { gap: 8px; }
-      .pc-amount      { font-size: 26px; }
+      .price-card     { padding: 11px 10px 10px; }
+      .pc-amount      { font-size: 28px; }
+      .pc-unit        { font-size: 15px; }
+      .pc-sub         { font-size: 11px; line-height: 1.35; }
+      .time-cell      { padding: 9px 10px 10px; }
+      .tc-price       { font-size: 19px; }
+      .periodic-panel { padding: 14px; }
+      .period-new     { font-size: 24px; }
+      .alt-route      { margin: 12px 18px 0; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -892,6 +941,12 @@
 
   <!-- MAP -->
   <div id="map"></div>
+
+  <!-- ALTERNATIV RUTE CALLOUT (sitter mellom kart og resultater) -->
+  <div class="alt-route" id="alt-route" style="display:none">
+    <span class="alt-route-text" id="alt-route-text"></span>
+    <button class="alt-route-btn" type="button" id="alt-route-btn">Vis</button>
+  </div>
 
   <!-- RESULTS -->
   <div class="w-results" id="results">
@@ -1006,7 +1061,7 @@ function adjustDays(delta) {
 }
 
 function fmtNok(n) {
-  return Math.round(n).toLocaleString('nb-NO') + ' kr';
+  return n.toLocaleString('nb-NO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr';
 }
 
 function updatePeriodic() {
@@ -1097,8 +1152,24 @@ function isRush(t, weekday) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MAP
 // ─────────────────────────────────────────────────────────────────────────────
-let map, tileLayer, routeLine, startMark, endMark;
+let map, tileLayer, startMark, endMark;
+let routeLines = [];   // alle rute-polylinjer (aktiv + alternativer)
 const sCircles = [];
+
+function styleRouteLines() {
+  const c = mapColors();
+  const altColor = isDark() ? '#777' : '#aaa';
+  routeLines.forEach((line, i) => {
+    const isActive = lastResult && i === lastResult.activeIdx;
+    line.setStyle({
+      color:     isActive ? c.line   : altColor,
+      weight:    isActive ? 4        : 3,
+      opacity:   isActive ? 0.9      : 0.55,
+      dashArray: isActive ? null     : '6,8',
+    });
+    if (isActive) line.bringToFront();
+  });
+}
 
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 const isDark = () => darkQuery.matches;
@@ -1150,7 +1221,7 @@ darkQuery.addEventListener('change', () => {
       maxZoom: 19
     }).addTo(map);
   }
-  if (routeLine) routeLine.setStyle({ color: mapColors().line });
+  if (routeLines.length) styleRouteLines();
   if (lastResult) renderResults();
 });
 
@@ -1265,11 +1336,69 @@ document.getElementById('dep-time').addEventListener('change', e => reRender('ti
 // ROUTING
 // ─────────────────────────────────────────────────────────────────────────────
 async function getRoute(from, to) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&alternatives=2`;
   const d = await (await fetch(url)).json();
   if (d.code !== 'Ok') throw new Error('Ingen rute');
-  return d.routes[0].geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
+  return d.routes.map(r => ({
+    pts:      r.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] })),
+    distance: r.distance,   // meter
+    duration: r.duration,   // sekunder
+  }));
 }
+
+// Beregn et koordinat distM meter unna (lat,lng) i retning bearingDeg (0=N, 90=Ø)
+function offsetCoord(lat, lng, bearingDeg, distM) {
+  const R = 6378137;
+  const δ  = distM / R;
+  const θ  = bearingDeg * Math.PI / 180;
+  const φ1 = lat * Math.PI / 180;
+  const λ1 = lng * Math.PI / 180;
+  const φ2 = Math.asin(Math.sin(φ1)*Math.cos(δ) + Math.cos(φ1)*Math.sin(δ)*Math.cos(θ));
+  const λ2 = λ1 + Math.atan2(Math.sin(θ)*Math.sin(δ)*Math.cos(φ1), Math.cos(δ) - Math.sin(φ1)*Math.sin(φ2));
+  return { lat: φ2 * 180 / Math.PI, lng: λ2 * 180 / Math.PI };
+}
+
+async function fetchRouteVia(from, via, to) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${via.lng},${via.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+    const d = await (await fetch(url)).json();
+    if (d.code !== 'Ok') return null;
+    const r = d.routes[0];
+    return {
+      pts:      r.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] })),
+      distance: r.distance,
+      duration: r.duration,
+    };
+  } catch { return null; }
+}
+
+// Forsøk å finne ruter som unngår de bommene primærruten passerer.
+// Genererer via-punkt 700 m perpendikulært på bommens innkrevingsretning (begge sider).
+async function findAlternativeRoutes(from, to, primary, considerReturn) {
+  const targets = considerReturn
+    ? [...primary.hit, ...primary.hitReturn]
+    : [...primary.hit];
+  if (!targets.length) return [];
+
+  const candidates = targets.slice(0, 3); // cap = 6 ekstra OSRM-kall maks
+  const promises = [];
+  candidates.forEach(s => {
+    const target = DIRBR[s.dir] ?? 0;
+    [(target + 90) % 360, (target + 270) % 360].forEach(brg => {
+      const via = offsetCoord(s.lat, s.lng, brg, 700);
+      promises.push(fetchRouteVia(from, via, to));
+    });
+  });
+
+  const detours = (await Promise.all(promises)).filter(Boolean);
+  return detours.map(r => {
+    const { outbound: hit, returnOnly: hitReturn } = detectStations(r.pts);
+    return { ...r, hit, hitReturn, n: hit.length, nReturn: hitReturn.length };
+  });
+}
+
+// Hvor stor besparelse må alternativet ha før vi foreslår det (i kr)
+const ALT_SUGGEST_THRESHOLD = 8;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GEOMETRY
@@ -1339,7 +1468,7 @@ function detectStations(pts) {
 // ─────────────────────────────────────────────────────────────────────────────
 // FORMAT
 // ─────────────────────────────────────────────────────────────────────────────
-const fmt = n => n === 0 ? '0' : Number.isInteger(n) ? `${n}` : n.toFixed(1);
+const fmt = n => n.toFixed(2).replace('.', ',');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRICING HELPERS + RENDER
@@ -1350,6 +1479,30 @@ function unitFor(vehicle, key, old) {
     ? (vehicle === 'ev' ? 0 : PRICE.old[vehicle][key])
     : PRICE.new[vehicle][key];
   return base * apF;
+}
+
+// Velg billigste rute. Ved likhet: korteste distanse.
+function bestRouteIdx(newUnit) {
+  if (!lastResult || !lastResult.routes.length) return 0;
+  let bestIdx = 0, bestPrice = Infinity, bestDist = Infinity;
+  lastResult.routes.forEach((r, i) => {
+    const stations = r.n + (state.roundTrip ? r.nReturn : 0);
+    const price    = stations * newUnit;
+    if (price < bestPrice || (price === bestPrice && r.distance < bestDist)) {
+      bestPrice = price;
+      bestDist  = r.distance;
+      bestIdx   = i;
+    }
+  });
+  return bestIdx;
+}
+
+function swapRoute(idx) {
+  if (!lastResult || idx === lastResult.activeIdx) return;
+  lastResult.activeIdx = idx;
+  styleRouteLines();
+  renderResults();
+  updatePeriodic();
 }
 
 function renderResults() {
@@ -1417,6 +1570,44 @@ function renderResults() {
     } else {
       banner.classList.add('is-neutral');
       diffText.textContent = 'Prisen er uendret for denne turen.';
+    }
+  }
+
+  // ── Alternativ rute callout ──
+  const altEl   = document.getElementById('alt-route');
+  const altText = document.getElementById('alt-route-text');
+  const altBtn  = document.getElementById('alt-route-btn');
+  altEl.style.display = 'none';
+
+  if (lastResult.routes.length > 1) {
+    const best    = bestRouteIdx(newUnit);
+    const active  = lastResult.activeIdx;
+    const activeR = lastResult.routes[active];
+    const bestR   = lastResult.routes[best];
+    const fmtKm   = m => (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',');
+
+    if (best !== active) {
+      const stationsActive = activeR.n + (state.roundTrip ? activeR.nReturn : 0);
+      const stationsBest   = bestR.n   + (state.roundTrip ? bestR.nReturn   : 0);
+      const saving         = (stationsActive - stationsBest) * newUnit;
+      const kmDelta        = bestR.distance - activeR.distance;
+      if (saving >= ALT_SUGGEST_THRESHOLD) {
+        const distLbl = kmDelta > 0 ? `+${fmtKm(kmDelta)}&nbsp;km`
+                      : kmDelta < 0 ? `${fmtKm(kmDelta)}&nbsp;km`
+                      : 'samme distanse';
+        altText.innerHTML = `Spar <strong>${fmt(saving)}&nbsp;kr</strong> ved å kjøre alternativ rute (${distLbl}).`;
+        altBtn.textContent = 'Vis alternativ';
+        altBtn.onclick = () => swapRoute(best);
+        altEl.style.display = 'flex';
+      }
+    } else if (active !== 0) {
+      const kmDelta = activeR.distance - lastResult.routes[0].distance;
+      const distLbl = kmDelta > 0 ? `+${fmtKm(kmDelta)}&nbsp;km vs. korteste`
+                    : 'korteste rute';
+      altText.innerHTML = `Viser alternativ rute (${distLbl}).`;
+      altBtn.textContent = 'Tilbake';
+      altBtn.onclick = () => swapRoute(0);
+      altEl.style.display = 'flex';
     }
   }
 
@@ -1538,39 +1729,77 @@ async function calculate() {
   loadEl.style.display = 'block';
 
   try {
-    const pts = await getRoute(from, to);
+    const routes = await getRoute(from, to);
 
     initMap();
-    if (routeLine)  map.removeLayer(routeLine);
+    routeLines.forEach(l => map.removeLayer(l));
+    routeLines = [];
     if (startMark)  map.removeLayer(startMark);
     if (endMark)    map.removeLayer(endMark);
 
-    routeLine = L.polyline(pts.map(p => [p.lat, p.lng]), {
-      color: mapColors().line, weight: 4, opacity: 0.9
-    }).addTo(map);
+    // Detekter bommer for hver rute
+    const routesWithBommer = routes.map(r => {
+      const { outbound: hit, returnOnly: hitReturn } = detectStations(r.pts);
+      return {
+        ...r,
+        hit, hitReturn,
+        n: hit.length,
+        nReturn: hitReturn.length,
+      };
+    });
+
+    // Generer avoid-bom-detours hvis primærruten treffer bommer
+    const detours = await findAlternativeRoutes(from, to, routesWithBommer[0], state.roundTrip);
+    const allRoutes = [...routesWithBommer, ...detours];
+
+    // Dedupe: behold én rute per unik bom-signatur (korteste vinner). Primær er alltid med.
+    const sigOf = r => [...r.hit, ...r.hitReturn].map(s => s.name).sort().join('|');
+    const primarySig = sigOf(routesWithBommer[0]);
+    const bySig = new Map();
+    bySig.set(primarySig, routesWithBommer[0]);   // primær er alltid index 0
+    allRoutes.slice(1).forEach(r => {
+      const sig = sigOf(r);
+      if (sig === primarySig) return; // hopp over alt som treffer samme bommer som primær
+      const existing = bySig.get(sig);
+      if (!existing || r.distance < existing.distance) bySig.set(sig, r);
+    });
+    const finalRoutes = [routesWithBommer[0], ...Array.from(bySig.values()).filter(r => r !== routesWithBommer[0])];
+
+    // Tegn alle ruter (active styles settes etterpå via styleRouteLines)
+    finalRoutes.forEach(r => {
+      const line = L.polyline(r.pts.map(p => [p.lat, p.lng])).addTo(map);
+      routeLines.push(line);
+    });
     startMark = L.marker([from.lat, from.lng]).addTo(map).bindPopup('Start: ' + fromTxt);
     endMark   = L.marker([to.lat,   to.lng  ]).addTo(map).bindPopup('Mål: '   + toTxt);
-    map.fitBounds(routeLine.getBounds(), { padding: [45, 45] });
+    map.fitBounds(routeLines[0].getBounds(), { padding: [45, 45] });
 
-    const { outbound: hit, returnOnly: hitReturn } = detectStations(pts);
-
-    // Snapshot route-avhengig data — render-funksjonen leser dette + live state
     lastResult = {
-      hit, hitReturn,
-      n: hit.length,
-      nReturn: hitReturn.length,
+      routes: finalRoutes,
+      activeIdx: 0,
       vehicle, time,
-      // Beregnes på nytt i renderResults via state, men brukt av updatePeriodic
-      get newUnit() { return unitFor(this.vehicle, isRush(this.time, state.weekday) ? 'r' : 'n', false); },
-      get oldUnit() { return unitFor(this.vehicle, isRush(this.time, state.weekday) ? 'r' : 'n', true); },
+      // Aktiv rute som flate felter — render-funksjonen og updatePeriodic leser disse
+      get hit()       { return this.routes[this.activeIdx].hit; },
+      get hitReturn() { return this.routes[this.activeIdx].hitReturn; },
+      get n()         { return this.routes[this.activeIdx].n; },
+      get nReturn()   { return this.routes[this.activeIdx].nReturn; },
+      get newUnit()   { return unitFor(this.vehicle, isRush(this.time, state.weekday) ? 'r' : 'n', false); },
+      get oldUnit()   { return unitFor(this.vehicle, isRush(this.time, state.weekday) ? 'r' : 'n', true); },
     };
 
+    styleRouteLines();
     renderResults();
     updatePeriodic();
 
     const resultsEl = document.getElementById('results');
     resultsEl.style.display = 'flex';
-    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // På mobil: scroll til kartet så ruten + første del av prisen er i skjermbildet
+    // På desktop: scroll til prisresultatet siden kartet allerede er synlig
+    const target = window.matchMedia('(max-width: 640px)').matches
+      ? document.getElementById('map')
+      : resultsEl;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   } catch (err) {
     errEl.textContent = 'Kunne ikke beregne ruten. Sjekk adressene og prøv igjen.';
