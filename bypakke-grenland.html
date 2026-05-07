@@ -302,22 +302,50 @@
       flex-wrap: wrap;
       gap: 8px;
     }
+
+    .settings-summary {
+      font-size: 11.5px;
+      color: var(--pm-gray-dark);
+      line-height: 1.45;
+      margin-top: 6px;
+      font-style: italic;
+    }
+    .settings-summary strong {
+      color: var(--pm-text);
+      font-weight: 600;
+      font-style: normal;
+    }
     .meta-toggle-pill {
       font-family: var(--font-sans);
       font-size: 10.5px;
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      padding: 5px 12px;
+      padding: 5px 12px 5px 10px;
       border: 1px solid var(--pm-line);
       border-radius: 999px;
       background: transparent;
       color: var(--pm-gray-dark);
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       transition:
         border-color var(--motion-fast) var(--ease-standard),
         background   var(--motion-fast) var(--ease-standard),
         color        var(--motion-fast) var(--ease-standard);
+    }
+    .meta-toggle-pill::before {
+      content: '✕';
+      color: var(--pm-red);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+    .meta-toggle-pill.is-on::before {
+      content: '✓';
+      color: var(--pm-green);
     }
     .meta-toggle-pill.is-on {
       border: 1.5px solid var(--pm-primary-on);
@@ -949,6 +977,9 @@
       .periodic-panel { padding: 14px; }
       .period-new     { font-size: 24px; }
       .route-picker   { margin: 12px 18px 0; padding: 9px 12px; }
+
+      /* Forhindre iOS Safari auto-zoom på input-felt (krever ≥16 px font) */
+      .meta-input, .meta-select, input[type="time"] { font-size: 16px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1021,7 +1052,7 @@
     </div>
 
     <div class="field">
-      <label>Innstillinger</label>
+      <label>Forutsetninger</label>
       <div class="toggle-row">
         <button class="meta-toggle-pill is-on" id="tog-weekday" onclick="togglePill(this, 'weekday')">
           Hverdag
@@ -1033,6 +1064,7 @@
           AutoPASS-rabatt
         </button>
       </div>
+      <p class="settings-summary" id="settings-summary"></p>
     </div>
 
     <button class="btn-calc" id="btn-calc" onclick="calculate()">
@@ -1211,10 +1243,25 @@ let daysPerWeek = 5;
 function togglePill(btn, key) {
   state[key] = !state[key];
   btn.classList.toggle('is-on', state[key]);
+  updateSettingsSummary();
   if (lastResult && (key === 'roundTrip' || key === 'autopass' || key === 'weekday')) {
     renderResults();
     updatePeriodic();
   }
+}
+
+function updateSettingsSummary() {
+  const el = document.getElementById('settings-summary');
+  if (!el) return;
+  const time      = document.getElementById('dep-time').value;
+  const inRush    = isRush(time, state.weekday);
+  const dayPart   = state.weekday ? 'hverdag' : 'helg/fridag';
+  const rushPart  = state.weekday
+    ? (inRush ? `kl. ${time} (rushtid)` : `kl. ${time} (utenom rushtid)`)
+    : `kl. ${time}`;
+  const tripPart  = state.roundTrip ? 'tur og retur' : 'kun én vei';
+  const apPart    = state.autopass  ? 'med AutoPASS-rabatt' : 'uten AutoPASS-rabatt';
+  el.innerHTML = `Beregnet for <strong>${dayPart}</strong>, <strong>${rushPart}</strong>, <strong>${tripPart}</strong>, <strong>${apPart}</strong>.`;
 }
 
 function adjustDays(delta) {
@@ -1490,6 +1537,7 @@ function swapAddresses() {
 
 // Live re-render når kjøretøy/tid endres (ingen ny OSRM-fetch nødvendig)
 function reRender(field, value) {
+  if (field === 'time') updateSettingsSummary();   // rushtid kan flippe når tiden endres
   if (!lastResult) return;
   lastResult[field] = value;
   renderResults();
@@ -1497,6 +1545,9 @@ function reRender(field, value) {
 }
 document.getElementById('vehicle').addEventListener('change', e => reRender('vehicle', e.target.value));
 document.getElementById('dep-time').addEventListener('change', e => reRender('time', e.target.value));
+
+// Initialiser oppsummeringslinjen ved sidelast
+updateSettingsSummary();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTING
@@ -1997,12 +2048,9 @@ async function calculate() {
     const resultsEl = document.getElementById('results');
     resultsEl.style.display = 'flex';
 
-    // På mobil: scroll til kartet så ruten + første del av prisen er i skjermbildet
-    // På desktop: scroll til prisresultatet siden kartet allerede er synlig
-    const target = window.matchMedia('(max-width: 640px)').matches
-      ? document.getElementById('map')
-      : resultsEl;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll til kartet — gir visuell bekreftelse av ruten øverst i viewporten,
+    // med priser/stasjoner rett under når brukeren scroller (eller automatisk hvis høy nok skjerm)
+    document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   } catch (err) {
     errEl.textContent = 'Kunne ikke beregne ruten. Sjekk adressene og prøv igjen.';
