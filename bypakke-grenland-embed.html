@@ -16,12 +16,6 @@
   Begrunnelse: Kjernen i widgeten er adresse→adresse-ruting med kart-visning.
   Kan ikke leveres uten ekstern flise-, geokodings- og rutings-tjeneste.
 -->
-<!DOCTYPE html>
-<html lang="no">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bomkalkulator – Bypakke Grenland fra 11. mai</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
@@ -110,15 +104,6 @@
     #pm-widget-bompenger-grenland *,
         #pm-widget-bompenger-grenland *::before,
         #pm-widget-bompenger-grenland *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* Defensiv reset mot at artikkel-CSS lekker INN i widgeten (Nivå 3-isolasjon).
-       Tvinger typografi-elementer til å arve fra widget-rot, ikke fra artikkel-h1/p osv. */
-    #pm-widget-bompenger-grenland :where(h1, h2, h3, h4, h5, h6, p, a, span,
-        strong, em, b, i, button, input, select, textarea, label, ul, ol, li) {
-      color: inherit;
-      font-family: inherit;
-      font-weight: inherit;
-    }
 
     #pm-widget-bompenger-grenland {
       font-family: var(--font-sans);
@@ -1026,8 +1011,6 @@
 
   
   </style>
-</head>
-<body>
 
 <div id="pm-widget-bompenger-grenland" class="widget">
 
@@ -2166,5 +2149,3 @@ async function calculate() {
   }
 }
 </script>
-</body>
-</html>
