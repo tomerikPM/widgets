@@ -99,6 +99,7 @@
       font-size: 14px;
       background: var(--pm-back);
       color: var(--pm-text);
+      padding: clamp(8px, 2.5vw, 24px);
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
       font-feature-settings: 'cv02', 'cv03', 'cv04';
@@ -519,42 +520,75 @@
     .diff-text   { font-size: 12.5px; line-height: 1.5; }
     .diff-text strong { font-weight: 700; }
 
-    /* Alternativ rute callout (sitter mellom kart og resultater) */
-    .alt-route {
+    /* Rute-velger (sitter mellom kart og resultater, pills for hver tilgjengelig rute) */
+    .route-picker {
       display: none;
       align-items: center;
-      gap: 10px;
-      padding: 9px 13px;
+      gap: 12px;
+      padding: 10px 14px;
       margin: 14px 24px 0;
       border-radius: var(--square-border);
-      background: var(--pm-primary-light);
-      border: 1px solid color-mix(in srgb, var(--pm-primary-on) 25%, transparent);
-      color: var(--pm-primary-on);
-      font-size: 12.5px;
-      line-height: 1.45;
+      background: var(--pm-bright);
+      border: 1px solid var(--pm-line);
       flex-wrap: wrap;
     }
-    .alt-route-text { flex: 1; min-width: 200px; }
-    .alt-route-text strong { font-weight: 700; }
-    .alt-route-btn {
-      background: var(--pm-primary-on);
-      color: var(--vd-hvit);
-      border: none;
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 11px;
+    .route-picker-label {
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.4px;
       text-transform: uppercase;
-      cursor: pointer;
-      font-family: var(--font-sans);
-      white-space: nowrap;
-      transition: background var(--motion-fast) var(--ease-standard),
-                  transform  var(--motion-base) var(--ease-standard);
+      letter-spacing: 1.5px;
+      color: var(--pm-gray-dark);
       flex-shrink: 0;
     }
-    .alt-route-btn:hover  { background: color-mix(in srgb, var(--pm-primary-on) 80%, black); }
-    .alt-route-btn:active { transform: scale(0.95); transition-duration: 60ms; }
+    .route-picker-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+    .route-tab {
+      padding: 6px 12px;
+      font-size: 11.5px;
+      font-weight: 500;
+      border-radius: 999px;
+      border: 1px solid var(--pm-line);
+      background: var(--pm-absolute);
+      color: var(--pm-text);
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: var(--font-sans);
+      letter-spacing: 0.1px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: border-color var(--motion-fast) var(--ease-standard),
+                  background   var(--motion-fast) var(--ease-standard),
+                  color        var(--motion-fast) var(--ease-standard);
+    }
+    .route-tab:hover { border-color: var(--pm-gray); }
+    .route-tab.is-active {
+      background: var(--pm-primary);
+      color: var(--pm-primary-on);
+      border-color: var(--pm-primary-on);
+      font-weight: 600;
+    }
+    .route-tab .tab-price {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .route-tab .tab-badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--vd-gronn);
+      color: var(--vd-mgronn);
+    }
+    .route-tab.is-cheapest:not(.is-active) {
+      border-color: var(--vd-mgronn);
+    }
 
     /* Station list */
     .station-list {
@@ -616,6 +650,76 @@
       margin-left: 8px;
     }
     .s-price.is-muted { color: var(--pm-gray); font-weight: 600; }
+
+    /* Info section ("Slik beregnes prisen") */
+    .info-section {
+      border: 1px solid var(--pm-line);
+      border-radius: var(--square-border);
+      background: var(--pm-bright);
+      overflow: hidden;
+    }
+    .info-summary {
+      cursor: pointer;
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--pm-gray-dark);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      list-style: none;
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+    .info-summary::-webkit-details-marker { display: none; }
+    .info-summary:hover { background: color-mix(in srgb, var(--pm-text) 3%, transparent); }
+    .info-summary-arrow {
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--pm-text);
+      transition: transform var(--motion-base) var(--ease-standard);
+      line-height: 1;
+    }
+    .info-section[open] .info-summary-arrow { transform: rotate(45deg); }
+
+    .info-body {
+      padding: 4px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border-top: 1px solid var(--pm-line);
+    }
+    .info-block h5 {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--pm-gray-dark);
+      margin-bottom: 8px;
+      margin-top: 8px;
+    }
+    .info-block dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 4px 14px;
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+    .info-block dt {
+      color: var(--pm-text);
+      font-weight: 500;
+    }
+    .info-block dd {
+      color: var(--pm-gray-dark);
+      font-variant-numeric: tabular-nums;
+    }
+    .info-block p {
+      font-size: 12.5px;
+      color: var(--pm-text);
+      line-height: 1.5;
+    }
+    .info-block p + p { margin-top: 6px; }
 
     /* Footnote */
     .w-footnote {
@@ -844,7 +948,7 @@
       .tc-price       { font-size: 19px; }
       .periodic-panel { padding: 14px; }
       .period-new     { font-size: 24px; }
-      .alt-route      { margin: 12px 18px 0; }
+      .route-picker   { margin: 12px 18px 0; padding: 9px 12px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -907,6 +1011,7 @@
           <option value="light">Bensin / diesel</option>
           <option value="ev">Elbil / nullutslipp</option>
           <option value="heavy">Tung (&gt;3500 kg)</option>
+          <option value="heavy-ev">Tung nullutslipp</option>
         </select>
       </div>
       <div class="field">
@@ -942,10 +1047,10 @@
   <!-- MAP -->
   <div id="map"></div>
 
-  <!-- ALTERNATIV RUTE CALLOUT (sitter mellom kart og resultater) -->
-  <div class="alt-route" id="alt-route" style="display:none">
-    <span class="alt-route-text" id="alt-route-text"></span>
-    <button class="alt-route-btn" type="button" id="alt-route-btn">Vis</button>
+  <!-- RUTE-VELGER (sitter mellom kart og resultater, viser alle alternativer som pills) -->
+  <div class="route-picker" id="route-picker" style="display:none">
+    <span class="route-picker-label">Rute</span>
+    <div class="route-picker-tabs" id="route-picker-tabs"></div>
   </div>
 
   <!-- RESULTS -->
@@ -1023,12 +1128,70 @@
       </div>
     </div>
 
+    <details class="info-section">
+      <summary class="info-summary">
+        <span>Slik beregnes prisen</span>
+        <span class="info-summary-arrow">+</span>
+      </summary>
+      <div class="info-body">
+
+        <div class="info-block">
+          <h5>Priser fra 11. mai 2026 (fase 2)</h5>
+          <dl>
+            <dt>Lett kjøretøy</dt>          <dd>21,00 kr (29,00 kr i rushtid)</dd>
+            <dt>Tunge kjøretøy</dt>          <dd>42,00 kr (58,00 kr i rushtid)</dd>
+            <dt>Tunge nullutslipp</dt>       <dd>Gratis</dd>
+            <dt>Lett m/AutoPASS</dt>         <dd>16,80 kr (23,20 kr i rushtid)</dd>
+            <dt>Tunge m/AutoPASS</dt>        <dd>33,60 kr (46,40 kr i rushtid)</dd>
+            <dt>Lett nullutslipp m/AutoPASS</dt><dd>11,76 kr (16,24 kr i rushtid)</dd>
+          </dl>
+        </div>
+
+        <div class="info-block">
+          <h5>Priser før 11. mai (fase 1)</h5>
+          <dl>
+            <dt>Lett kjøretøy</dt>      <dd>17,00 kr (23,00 kr i rushtid)</dd>
+            <dt>Tunge kjøretøy</dt>      <dd>27,00 kr (38,00 kr i rushtid)</dd>
+            <dt>Nullutslippskjøretøy</dt><dd>Gratis</dd>
+          </dl>
+        </div>
+
+        <div class="info-block">
+          <h5>Rushtid</h5>
+          <p>Kl. 07–09 og 15–17 mandag til fredag, unntatt offentlige fri- og helgedager. Bryteren <em>Hverdag</em> styrer om dagen regnes som ukedag.</p>
+        </div>
+
+        <div class="info-block">
+          <h5>AutoPASS-rabatt</h5>
+          <p>20&nbsp;% brikkerabatt for alle kjøretøy. Lette nullutslippskjøretøy får 30&nbsp;% ekstra rabatt etter brikkerabatten — kun i kombinasjon med AutoPASS-avtale. Uten AutoPASS betaler elbiler ordinær lett-pris.</p>
+        </div>
+
+        <div class="info-block">
+          <h5>Timesregelen</h5>
+          <p>Med AutoPASS-brikke belastes kun én passering per time, uavhengig av antall bomstasjoner. Uten brikke betales hver passering separat.</p>
+          <p>Ved tur/retur antar kalkulatoren at hjemreisen skjer mer enn én time etter avreise — slik at hver vei utløser sin egen belastning innenfor timesregelen.</p>
+        </div>
+
+        <div class="info-block">
+          <h5>Innkrevingsretning</h5>
+          <p>De fleste bommene krever kun i én retning (mot nord eller mot øst). Bommer du krysser i motsatt retning belastes på tilbakeveien — markert med gul prikk i kartet og listen.</p>
+        </div>
+
+        <div class="info-block">
+          <h5>Månedstak</h5>
+          <p>Maksimalt 60 betalte passeringer per måned per kjøretøy. Passeringer utover dette er gratis.</p>
+        </div>
+
+        <div class="info-block">
+          <h5>Rute og bomstasjoner</h5>
+          <p>Kalkulatoren dekker kun de 13 bomstasjonene i Bypakke Grenland. Bompasseringer utenfor Grenland (andre bypakker, ferjer, motorveistasjoner) er ikke inkludert.</p>
+          <p>Foreslått rute hentes fra OpenStreetMap-data via OSRM og kan inneholde feil eller mangle informasjon om sperringer, kjøreforbud eller midlertidige stengninger.</p>
+        </div>
+
+      </div>
+    </details>
+
     <div class="w-footnote">
-      <p class="w-disclaimer"><strong>Merk:</strong> Kalkulatoren dekker kun bomstasjonene i Bypakke Grenland.
-      Eventuelle bompasseringer utenfor Grenland er ikke regnet med.</p>
-      <strong>Timesregelen:</strong> én betalende passering per time, uavhengig av antall bommer.
-      AutoPASS-avtale gir 20&nbsp;% rabatt. Elbiler betaler 70&nbsp;% av normaltakst.
-      Månedlig tak: 60 passeringer. Bomstasjonene krever kun i én retning — gule prikker viser bommer du belastes for på tilbakeveien.
       Beregningen er veiledende. Bomdata: <a href="https://bypakka.no/bompenger/" target="_blank">bypakka.no</a> ·
       Kart: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" target="_blank">CARTO</a> · Ruting: OSRM.
     </div>
@@ -1068,7 +1231,7 @@ function updatePeriodic() {
   if (!lastResult) return;
   const { n, nReturn, newUnit, oldUnit } = lastResult;
 
-  const stationsPerDay   = n + (state.roundTrip ? nReturn : 0);
+  const stationsPerDay   = chargedStations({ n, nReturn }, state.roundTrip);
   const stationsPerWeek  = daysPerWeek * stationsPerDay;
   const monthlyPassages  = Math.round(stationsPerWeek * 52 / 12);
   const paidMonthly      = Math.min(monthlyPassages, 60);
@@ -1129,16 +1292,19 @@ const STATIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // PRICING
 // ─────────────────────────────────────────────────────────────────────────────
+// Priser fra bypakka.no/bompenger/
+// EV-prising håndteres i unitFor() — 30% rabatt gjelder KUN med AutoPASS-avtale
 const PRICE = {
   old: {
-    light: { n:17,   r:23   },
-    ev:    { n:0,    r:0    },   // was free
-    heavy: { n:27,   r:38   },
+    light: { n:17, r:23 },
+    heavy: { n:27, r:38 },
+    // Fase 1: EV var gratis
   },
   new: {
-    light: { n:21,   r:29   },
-    ev:    { n:14.7, r:20.3 },  // 70% of light; ×0.8 with AutoPASS ≈ 11.8/16.2
-    heavy: { n:43,   r:58   },
+    light: { n:21, r:29 },
+    heavy: { n:42, r:58 },
+    // Fase 2: EV = lett-pris × 0.8 × 0.7 med AutoPASS, ellers full lett-pris
+    // Tunge nullutslippskjøretøy = gratis (ikke håndtert i UI ennå)
   },
 };
 
@@ -1373,20 +1539,25 @@ async function fetchRouteVia(from, via, to) {
 }
 
 // Forsøk å finne ruter som unngår de bommene primærruten passerer.
-// Genererer via-punkt 700 m perpendikulært på bommens innkrevingsretning (begge sider).
+// For hver bom: genererer via-punkt på begge perpendikulære sider, ved 3 ulike distanser
+// — så OSRM får flere muligheter til å finne en god omvei.
+const DETOUR_DISTANCES_M = [400, 700, 1100];
+
 async function findAlternativeRoutes(from, to, primary, considerReturn) {
   const targets = considerReturn
     ? [...primary.hit, ...primary.hitReturn]
     : [...primary.hit];
   if (!targets.length) return [];
 
-  const candidates = targets.slice(0, 3); // cap = 6 ekstra OSRM-kall maks
+  const candidates = targets.slice(0, 3); // cap = 3 bommer × 2 sider × 3 distanser = 18 OSRM-kall maks
   const promises = [];
   candidates.forEach(s => {
     const target = DIRBR[s.dir] ?? 0;
     [(target + 90) % 360, (target + 270) % 360].forEach(brg => {
-      const via = offsetCoord(s.lat, s.lng, brg, 700);
-      promises.push(fetchRouteVia(from, via, to));
+      DETOUR_DISTANCES_M.forEach(dist => {
+        const via = offsetCoord(s.lat, s.lng, brg, dist);
+        promises.push(fetchRouteVia(from, via, to));
+      });
     });
   });
 
@@ -1473,12 +1644,28 @@ const fmt = n => n.toFixed(2).replace('.', ',');
 // ─────────────────────────────────────────────────────────────────────────────
 // PRICING HELPERS + RENDER
 // ─────────────────────────────────────────────────────────────────────────────
+// Timesregelen: med AutoPASS-brikke kun én betalende passering per time.
+// Siden en typisk Grenland-tur < 60 min, behandles dette som "max 1 per retning per tur".
+function chargedStations(r, includeReturn) {
+  const out = state.autopass ? (r.n > 0 ? 1 : 0) : r.n;
+  const ret = state.autopass ? (r.nReturn > 0 ? 1 : 0) : r.nReturn;
+  return out + (includeReturn ? ret : 0);
+}
+
 function unitFor(vehicle, key, old) {
-  const apF = state.autopass ? 0.8 : 1;
-  const base = old
-    ? (vehicle === 'ev' ? 0 : PRICE.old[vehicle][key])
-    : PRICE.new[vehicle][key];
-  return base * apF;
+  const apF   = state.autopass ? 0.8 : 1;
+  const phase = old ? PRICE.old : PRICE.new;
+
+  if (vehicle === 'heavy-ev') return 0;                 // Tunge nullutslippskjøretøy er gratis i begge faser
+  if (vehicle === 'ev') {
+    if (old) return 0;                                  // EV var gratis i fase 1
+    // Fase 2: 30 % EV-rabatt gjelder KUN i kombinasjon med AutoPASS-avtale
+    return state.autopass
+      ? phase.light[key] * 0.8 * 0.7                    // brikke + EV-rabatt
+      : phase.light[key];                               // ingen rabatt uten AutoPASS
+  }
+
+  return phase[vehicle][key] * apF;
 }
 
 // Velg billigste rute. Ved likhet: korteste distanse.
@@ -1486,7 +1673,7 @@ function bestRouteIdx(newUnit) {
   if (!lastResult || !lastResult.routes.length) return 0;
   let bestIdx = 0, bestPrice = Infinity, bestDist = Infinity;
   lastResult.routes.forEach((r, i) => {
-    const stations = r.n + (state.roundTrip ? r.nReturn : 0);
+    const stations = chargedStations(r, state.roundTrip);
     const price    = stations * newUnit;
     if (price < bestPrice || (price === bestPrice && r.distance < bestDist)) {
       bestPrice = price;
@@ -1514,32 +1701,49 @@ function renderResults() {
   const oldUnit = unitFor(vehicle, key, true);
   const newUnit = unitFor(vehicle, key, false);
 
-  const stations  = n + (state.roundTrip ? nReturn : 0);
+  const passages  = n + (state.roundTrip ? nReturn : 0);                    // faktiske bompasseringer
+  const stations  = chargedStations({ n, nReturn }, state.roundTrip);       // betalte (med timesregel)
   const oldTotal  = oldUnit * stations;
   const newTotal  = newUnit * stations;
+  const timesregelReducer = state.autopass && stations < passages;
 
   // ── Price cards ──
   const oldAmEl = document.getElementById('old-amt');
   const newAmEl = document.getElementById('new-amt');
+  const isFreeOld = (vehicle === 'ev' || vehicle === 'heavy-ev') && passages > 0;
+  const isFreeNew = vehicle === 'heavy-ev' && passages > 0;
 
-  if (vehicle === 'ev' && stations > 0) {
+  if (isFreeOld) {
     oldAmEl.innerHTML = '<span style="font-size:20px;color:var(--pm-text);font-weight:700;letter-spacing:-0.01em">Gratis</span>';
   } else {
     oldAmEl.innerHTML = `${fmt(oldTotal)}&thinsp;<span class="pc-unit">kr</span>`;
   }
-  newAmEl.innerHTML = `${fmt(newTotal)}&thinsp;<span class="pc-unit">kr</span>`;
+  if (isFreeNew) {
+    newAmEl.innerHTML = '<span style="font-size:20px;color:var(--pm-red);font-weight:700;letter-spacing:-0.01em">Gratis</span>';
+  } else {
+    newAmEl.innerHTML = `${fmt(newTotal)}&thinsp;<span class="pc-unit">kr</span>`;
+  }
 
   const rushLbl = rush ? 'rushtid' : 'normaltid';
   const apLbl   = state.autopass ? ' m/AutoPASS' : '';
   const trLbl   = state.roundTrip && nReturn > 0 ? ' · tur/retur' : '';
-  const bomLbl  = state.roundTrip && nReturn > 0
-    ? `${n} tur + ${nReturn} retur`
-    : (stations === 1 ? '1 bom' : `${stations} bommer`);
+  let bomLbl;
+  if (timesregelReducer) {
+    if (state.roundTrip && nReturn > 0 && n > 0) {
+      bomLbl = `1 tur + 1 retur (timesregel)`;
+    } else {
+      bomLbl = `1 av ${passages} pass. (timesregel)`;
+    }
+  } else {
+    bomLbl = state.roundTrip && nReturn > 0
+      ? `${n} tur + ${nReturn} retur`
+      : (passages === 1 ? '1 bom' : `${passages} bommer`);
+  }
 
-  document.getElementById('old-sub').textContent = stations > 0
+  document.getElementById('old-sub').textContent = passages > 0
     ? `${bomLbl} × ${fmt(oldUnit)} kr${apLbl} · ${rushLbl}${trLbl}`
     : 'Ingen bommer på ruten';
-  document.getElementById('new-sub').textContent = stations > 0
+  document.getElementById('new-sub').textContent = passages > 0
     ? `${bomLbl} × ${fmt(newUnit)} kr${apLbl} · ${rushLbl}${trLbl}`
     : 'Ingen bommer på ruten';
 
@@ -1549,7 +1753,7 @@ function renderResults() {
   const diffText = document.getElementById('diff-text');
   banner.className = 'diff-banner';
 
-  if (stations === 0) {
+  if (passages === 0) {
     banner.classList.add('is-info');
     diffText.innerHTML = nReturn > 0
       ? 'Ingen bommer på utveien. Skru på <strong>Tur / retur</strong> for å se kostnaden tilbake.'
@@ -1573,42 +1777,37 @@ function renderResults() {
     }
   }
 
-  // ── Alternativ rute callout ──
-  const altEl   = document.getElementById('alt-route');
-  const altText = document.getElementById('alt-route-text');
-  const altBtn  = document.getElementById('alt-route-btn');
-  altEl.style.display = 'none';
+  // ── Rute-velger ──
+  const picker = document.getElementById('route-picker');
+  const tabsEl = document.getElementById('route-picker-tabs');
+  picker.style.display = 'none';
 
   if (lastResult.routes.length > 1) {
-    const best    = bestRouteIdx(newUnit);
-    const active  = lastResult.activeIdx;
-    const activeR = lastResult.routes[active];
-    const bestR   = lastResult.routes[best];
-    const fmtKm   = m => (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',');
+    tabsEl.innerHTML = '';
+    const primaryDist = lastResult.routes[0].distance;
+    const fmtKm = m => (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',');
+    const cheapestIdx = bestRouteIdx(newUnit);
 
-    if (best !== active) {
-      const stationsActive = activeR.n + (state.roundTrip ? activeR.nReturn : 0);
-      const stationsBest   = bestR.n   + (state.roundTrip ? bestR.nReturn   : 0);
-      const saving         = (stationsActive - stationsBest) * newUnit;
-      const kmDelta        = bestR.distance - activeR.distance;
-      if (saving >= ALT_SUGGEST_THRESHOLD) {
-        const distLbl = kmDelta > 0 ? `+${fmtKm(kmDelta)}&nbsp;km`
-                      : kmDelta < 0 ? `${fmtKm(kmDelta)}&nbsp;km`
-                      : 'samme distanse';
-        altText.innerHTML = `Spar <strong>${fmt(saving)}&nbsp;kr</strong> ved å kjøre alternativ rute (${distLbl}).`;
-        altBtn.textContent = 'Vis alternativ';
-        altBtn.onclick = () => swapRoute(best);
-        altEl.style.display = 'flex';
-      }
-    } else if (active !== 0) {
-      const kmDelta = activeR.distance - lastResult.routes[0].distance;
-      const distLbl = kmDelta > 0 ? `+${fmtKm(kmDelta)}&nbsp;km vs. korteste`
-                    : 'korteste rute';
-      altText.innerHTML = `Viser alternativ rute (${distLbl}).`;
-      altBtn.textContent = 'Tilbake';
-      altBtn.onclick = () => swapRoute(0);
-      altEl.style.display = 'flex';
-    }
+    lastResult.routes.forEach((r, i) => {
+      const stations = chargedStations(r, state.roundTrip);
+      const price    = stations * newUnit;
+      const dM       = r.distance - primaryDist;
+      const distLbl  = i === 0
+        ? 'Raskeste'
+        : `+${fmtKm(dM)}&nbsp;km`;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const classes = ['route-tab'];
+      if (i === lastResult.activeIdx) classes.push('is-active');
+      if (i === cheapestIdx)          classes.push('is-cheapest');
+      btn.className = classes.join(' ');
+      const badge = (i === cheapestIdx && lastResult.routes.length > 1 && i !== 0) ? ' <span class="tab-badge">Billigst</span>' : '';
+      btn.innerHTML = `<span>${distLbl}</span> <span class="tab-price">${fmt(price)}&nbsp;kr</span>${badge}`;
+      btn.onclick = () => swapRoute(i);
+      tabsEl.appendChild(btn);
+    });
+    picker.style.display = 'flex';
   }
 
   // ── Station list ──
@@ -1625,8 +1824,11 @@ function renderResults() {
     li.innerHTML = '<span class="s-dot miss"></span><span class="s-name" style="color:var(--pm-gray)">Ingen bomstasjoner passeres</span>';
     listEl.appendChild(li);
   } else {
-    const priceLbl = `${fmt(newUnit)}&thinsp;kr`;
-    hit.forEach(s => {
+    const priceLbl   = `${fmt(newUnit)}&thinsp;kr`;
+    const mutedLbl   = `<span title="Timesregel">–</span>`;
+    hit.forEach((s, idx) => {
+      // Med AutoPASS belastes kun første passering på utveien (timesregel)
+      const isCharged = !state.autopass || idx === 0;
       const li = document.createElement('li');
       li.innerHTML =
         `<span class="s-dot hit"></span>` +
@@ -1634,19 +1836,20 @@ function renderResults() {
           `<div class="s-name">${s.name}</div>` +
           `<div class="s-road">${[s.road, s.city].filter(Boolean).join(' · ')}</div>` +
         `</div>` +
-        `<span class="s-price">${priceLbl}</span>`;
+        `<span class="s-price${isCharged ? '' : ' is-muted'}">${isCharged ? priceLbl : mutedLbl}</span>`;
       listEl.appendChild(li);
     });
-    hitReturn.forEach(s => {
+    hitReturn.forEach((s, idx) => {
+      // Med AutoPASS belastes kun første passering på retur, og bare hvis tur/retur er på
+      const isCharged = state.roundTrip && (!state.autopass || idx === 0);
       const li = document.createElement('li');
-      const muted = state.roundTrip ? '' : ' is-muted';
       li.innerHTML =
         `<span class="s-dot return"></span>` +
         `<div class="s-info">` +
           `<div class="s-name">${s.name} <span class="s-return-badge">retur</span></div>` +
           `<div class="s-road">${[s.road, s.city].filter(Boolean).join(' · ')}</div>` +
         `</div>` +
-        `<span class="s-price${muted}">${priceLbl}</span>`;
+        `<span class="s-price${isCharged ? '' : ' is-muted'}">${isCharged ? priceLbl : mutedLbl}</span>`;
       listEl.appendChild(li);
     });
   }
@@ -1667,7 +1870,7 @@ function renderResults() {
   });
 
   // ── Time comparison ──
-  if (stations > 0) {
+  if (passages > 0) {
     const normalUnit  = unitFor(vehicle, 'n', false);
     const rushUnit    = unitFor(vehicle, 'r', false);
     const normalTotal = normalUnit * stations;
