@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bomkalkulator – Bypakke Grenland fra 11. mai</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <!-- Inter variable font -->
+  <link rel="preconnect" href="https://rsms.me/">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+
+  <style>
+    /* ── VARDEN BRAND TOKENS ──────────────────────────────────────────────── */
+    :root {
+      /* Brand palette */
+      --vd-lin:    #F3EEEC;
+      --vd-sort:   #201E1C;
+      --vd-hvit:   #FFFFFF;
+      --vd-bla:    #B8F2FF;
+      --vd-mbla:   #004F58;
+      --vd-rosa:   #FFCFF0;
+      --vd-mrosa:  #5E044C;
+      --vd-gul:    #FAF6C1;
+      --vd-mgul:   #574500;
+      --vd-gronn:  #AEFFCB;
+      --vd-mgronn: #00522D;
+
+      /* Surfaces & text */
+      --pm-absolute:      var(--vd-hvit);
+      --pm-back:          var(--vd-lin);
+      --pm-text:          var(--vd-sort);
+
+      /* Semantic pairs: -light = pastel surface, base = dark contrast for text/borders */
+      --pm-primary:       var(--vd-bla);     /* light blue surface */
+      --pm-primary-on:    var(--vd-mbla);    /* dark teal — text on primary, borders, focus */
+      --pm-primary-light: color-mix(in srgb, var(--vd-bla) 55%, white);
+
+      --pm-red:           var(--vd-mrosa);   /* dark plum — text/borders */
+      --pm-red-light:     var(--vd-rosa);    /* light pink — surfaces */
+
+      --pm-green:         var(--vd-mgronn);
+      --pm-green-light:   var(--vd-gronn);
+
+      --pm-active:        var(--vd-mgul);    /* dark olive — text/borders */
+      --pm-active-light:  var(--vd-gul);     /* light yellow — surfaces */
+
+      --pm-gray:          color-mix(in srgb, var(--pm-text) 50%, var(--pm-back));
+      --pm-gray-dark:     color-mix(in srgb, var(--pm-text) 75%, var(--pm-back));
+      --pm-bright:        color-mix(in srgb, var(--pm-text) 4%, transparent);
+      --pm-line:          color-mix(in srgb, var(--pm-text), transparent 91%);
+
+      --square-border: 4px;
+      --round-border:  10px;
+
+      --motion-fast:   150ms;
+      --motion-base:   220ms;
+      --motion-medium: 300ms;
+
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+      --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --pm-absolute:      var(--vd-sort);
+        --pm-back:          #2A2826;
+        --pm-text:          var(--vd-lin);
+
+        --pm-primary:       var(--vd-mbla);
+        --pm-primary-on:    var(--vd-bla);
+        --pm-primary-light: color-mix(in srgb, var(--vd-mbla) 70%, black);
+
+        --pm-red:           var(--vd-rosa);
+        --pm-red-light:     var(--vd-mrosa);
+
+        --pm-green:         var(--vd-gronn);
+        --pm-green-light:   var(--vd-mgronn);
+
+        --pm-active:        var(--vd-gul);
+        --pm-active-light:  var(--vd-mgul);
+      }
+
+      /* Leaflet popup tilpasning */
+      .leaflet-popup-content-wrapper,
+      .leaflet-popup-tip {
+        background: var(--vd-sort);
+        color: var(--vd-lin);
+      }
+      .leaflet-container a.leaflet-popup-close-button { color: var(--vd-lin); }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      background: var(--pm-back);
+      color: var(--pm-text);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      font-feature-settings: 'cv02', 'cv03', 'cv04';
+    }
+
+    /* ── WIDGET SHELL ────────────────────────────────────────────────────── */
+    .widget {
+      max-width: 640px;
+      margin: 0 auto;
+      background: var(--pm-absolute);
+      border: 1px solid var(--pm-line);
+      border-radius: var(--round-border);
+      overflow: hidden;
+      box-shadow:
+        0 1px 2px -1px color-mix(in srgb, var(--pm-text) 10%, transparent),
+        0 4px 16px -4px color-mix(in srgb, var(--pm-text) 8%, transparent);
+    }
+
+    /* ── HEADER ──────────────────────────────────────────────────────────── */
+    .w-header {
+      background: var(--pm-primary);
+      color: var(--pm-primary-on);
+      padding: 20px 24px 18px;
+    }
+
+    .w-eyebrow {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.75;
+      margin-bottom: 8px;
+    }
+
+    .w-header h1 {
+      font-size: 19px;
+      font-weight: 700;
+      line-height: 1.22;
+      letter-spacing: -0.01em;
+      margin-bottom: 5px;
+    }
+
+    .w-header p {
+      font-size: 12.5px;
+      opacity: 0.78;
+      line-height: 1.45;
+    }
+
+    /* ── BODY (inputs) ───────────────────────────────────────────────────── */
+    .w-body {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Field wrapper — PM pattern */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .field label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--pm-gray-dark);
+    }
+
+    /* Address input with autocomplete */
+    .addr-wrap { position: relative; }
+
+    /* PM .meta-input — pill shaped */
+    .meta-input {
+      width: 100%;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      padding: 8px 14px;
+      border: 1px solid var(--pm-line);
+      border-radius: 999px;
+      background: var(--pm-absolute);
+      color: var(--pm-text);
+      outline: none;
+      transition:
+        border-color var(--motion-fast) var(--ease-standard),
+        box-shadow   var(--motion-fast) var(--ease-standard);
+    }
+    .meta-input:focus {
+      border-color: var(--pm-primary-on);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--pm-primary) 70%, transparent);
+    }
+    .meta-input::placeholder { color: var(--pm-gray); }
+
+    /* Autocomplete dropdown — PM overflow-menu pattern */
+    .suggestions {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: var(--pm-absolute);
+      border: 1px solid var(--pm-line);
+      border-radius: var(--square-border);
+      box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--pm-text) 16%, transparent);
+      z-index: 1200;
+      overflow: hidden;
+      padding: 4px 0;
+    }
+    .suggestions li {
+      list-style: none;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--pm-text);
+      border-bottom: 1px solid var(--pm-line);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+    .suggestions li:last-child { border-bottom: none; }
+    .suggestions li:hover,
+    .suggestions li.is-active {
+      background: color-mix(in srgb, var(--pm-primary) 35%, transparent);
+      color: var(--pm-primary-on);
+    }
+
+    /* Route connector arrow */
+    .route-connector {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      color: var(--pm-gray);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: -6px 0;
+    }
+    .route-connector::before,
+    .route-connector::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--pm-line);
+    }
+
+    /* PM .meta-select */
+    .meta-select {
+      width: 100%;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      padding: 8px 32px 8px 14px;
+      border: 1px solid var(--pm-line);
+      border-radius: 999px;
+      background: var(--pm-absolute) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+      color: var(--pm-text);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      transition:
+        border-color var(--motion-fast) var(--ease-standard),
+        box-shadow   var(--motion-fast) var(--ease-standard);
+    }
+    .meta-select:focus {
+      border-color: var(--pm-primary-on);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--pm-primary) 70%, transparent);
+    }
+
+    /* Two-column options row */
+    .opts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* PM .meta-toggle-pill */
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .meta-toggle-pill {
+      font-family: var(--font-sans);
+      font-size: 10.5px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 5px 12px;
+      border: 1px solid var(--pm-line);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--pm-gray-dark);
+      cursor: pointer;
+      transition:
+        border-color var(--motion-fast) var(--ease-standard),
+        background   var(--motion-fast) var(--ease-standard),
+        color        var(--motion-fast) var(--ease-standard);
+    }
+    .meta-toggle-pill.is-on {
+      border: 1.5px solid var(--pm-primary-on);
+      background: var(--pm-primary);
+      color: var(--pm-primary-on);
+    }
+
+    /* PM .btn.is-primary (scaled up for full-width CTA) */
+    .btn {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border-radius: var(--square-border);
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition:
+        background    var(--motion-fast) var(--ease-standard),
+        border-color  var(--motion-fast) var(--ease-standard),
+        transform     var(--motion-base) var(--ease-standard);
+    }
+    .btn:active {
+      transform: scale(0.95);
+      transition-duration: 60ms;
+    }
+    .btn:not(:active) { transition-timing-function: var(--ease-spring); }
+    .btn:disabled     { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-calc {
+      composes: btn;
+      width: 100%;
+      padding: 11px 20px;
+      font-size: 12px;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border: 1px solid var(--pm-primary-on);
+      border-radius: var(--square-border);
+      background: var(--pm-primary);
+      color: var(--pm-primary-on);
+      cursor: pointer;
+      transition:
+        background   var(--motion-fast) var(--ease-standard),
+        transform    var(--motion-base) var(--ease-standard);
+    }
+    .btn-calc:hover    { background: color-mix(in srgb, var(--pm-primary) 70%, var(--pm-primary-on)); color: var(--vd-hvit); }
+    .btn-calc:active   { transform: scale(0.97); transition-duration: 60ms; }
+    .btn-calc:not(:active) { transition-timing-function: var(--ease-spring); }
+    .btn-calc:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Error & loading */
+    .error-box {
+      display: none;
+      padding: 9px 14px;
+      background: var(--pm-red-light);
+      border: 1px solid color-mix(in srgb, var(--pm-red) 30%, transparent);
+      border-radius: var(--square-border);
+      font-size: 12.5px;
+      color: var(--pm-red);
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 12px;
+      font-size: 12.5px;
+      color: var(--pm-gray);
+    }
+
+    /* ── MAP ─────────────────────────────────────────────────────────────── */
+    #map {
+      display: none;
+      height: 300px;
+      border-top: 1px solid var(--pm-line);
+      border-bottom: 1px solid var(--pm-line);
+    }
+
+    /* ── RESULTS ─────────────────────────────────────────────────────────── */
+    .w-results {
+      display: none;
+      padding: 20px 24px 22px;
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Section heading — PM eyebrow style */
+    .section-eyebrow {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--pm-gray-dark);
+    }
+
+    /* Price comparison cards */
+    .price-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .price-card {
+      border: 1px solid var(--pm-line);
+      border-radius: var(--square-border);
+      padding: 14px 14px 12px;
+      text-align: center;
+      background: var(--pm-bright);
+    }
+
+    .price-card.is-new {
+      background: var(--pm-red-light);
+      border-color: color-mix(in srgb, var(--pm-red) 30%, transparent);
+    }
+
+    .pc-eyebrow {
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--pm-gray-dark);
+      margin-bottom: 8px;
+    }
+
+    .price-card.is-new .pc-eyebrow {
+      color: color-mix(in srgb, var(--pm-red) 80%, var(--pm-text));
+    }
+
+    .pc-amount {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin-bottom: 8px;
+      color: var(--pm-text);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum';
+    }
+
+    .price-card.is-new .pc-amount { color: var(--pm-red); }
+
+    .pc-unit {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-left: 3px;
+      color: color-mix(in srgb, currentColor 70%, transparent);
+    }
+
+    .pc-sub {
+      font-size: 11.5px;
+      color: var(--pm-gray-dark);
+      line-height: 1.4;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Diff banner */
+    .diff-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      border-radius: var(--square-border);
+      padding: 9px 13px;
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    .diff-banner.is-increase {
+      background: var(--pm-active-light);
+      border: 1px solid color-mix(in srgb, var(--pm-active) 35%, transparent);
+      color: var(--pm-active);
+    }
+
+    .diff-banner.is-ev-new {
+      background: var(--pm-red-light);
+      border: 1px solid color-mix(in srgb, var(--pm-red) 25%, transparent);
+      color: color-mix(in srgb, var(--pm-red) 80%, var(--pm-text));
+    }
+
+    .diff-banner.is-neutral {
+      background: var(--pm-green-light);
+      border: 1px solid color-mix(in srgb, var(--pm-green) 40%, transparent);
+      color: color-mix(in srgb, var(--pm-text) 80%, transparent);
+    }
+
+    .diff-banner.is-info {
+      background: var(--pm-primary-light);
+      border: 1px solid color-mix(in srgb, var(--pm-primary-on) 25%, transparent);
+      color: var(--pm-primary-on);
+    }
+
+    .diff-icon   { display: none; }
+    .diff-banner { border-left: 3px solid currentColor; padding-left: 12px; }
+    .diff-text   { font-size: 12.5px; line-height: 1.5; }
+    .diff-text strong { font-weight: 700; }
+
+    /* Station list */
+    .station-list {
+      list-style: none;
+      border: 1px solid var(--pm-line);
+      border-radius: var(--square-border);
+      overflow: hidden;
+    }
+
+    .station-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      font-size: 12.5px;
+      border-bottom: 1px solid var(--pm-line);
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+
+    .station-list li:last-child { border-bottom: none; }
+
+    .s-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .s-dot.hit    { background: var(--pm-red); }
+    .s-dot.miss   { background: var(--pm-gray); opacity: 0.4; }
+    .s-dot.return { background: var(--pm-active); }
+
+    .s-return-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 1px 6px;
+      margin-left: 4px;
+      border-radius: 999px;
+      background: var(--pm-active-light);
+      color: var(--pm-active);
+      vertical-align: middle;
+    }
+
+    .s-name { flex: 1; font-weight: 500; }
+    .s-road {
+      font-size: 11px;
+      color: var(--pm-gray);
+    }
+
+    /* Footnote */
+    .w-footnote {
+      font-size: 11px;
+      color: var(--pm-gray);
+      line-height: 1.6;
+      border-top: 1px solid var(--pm-line);
+      padding-top: 12px;
+    }
+    .w-footnote a { color: var(--pm-gray); text-decoration: underline; }
+
+    /* ── TIME COMPARISON ────────────────────────────────────────────────── */
+    .time-row {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--pm-line);
+      border-radius: var(--square-border);
+      overflow: hidden;
+    }
+
+    .time-cell {
+      flex: 1;
+      padding: 10px 13px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: var(--pm-bright);
+      position: relative;
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+
+    .time-cell + .time-cell {
+      border-left: 1px solid var(--pm-line);
+    }
+
+    .time-cell.is-now {
+      background: var(--pm-primary-light);
+    }
+
+    .tc-now-badge {
+      display: none;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--pm-primary-on);
+      margin-bottom: 2px;
+    }
+
+    .time-cell.is-now .tc-now-badge { display: block; }
+
+    .tc-head {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--pm-gray-dark);
+    }
+
+    .tc-hours {
+      font-size: 11px;
+      color: var(--pm-gray);
+      line-height: 1.35;
+    }
+
+    .tc-price {
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--pm-text);
+      margin-top: 5px;
+      line-height: 1;
+    }
+
+    .time-cell.is-now .tc-price {
+      color: var(--pm-primary-on);
+    }
+
+    .tc-unit { font-size: 13px; font-weight: 500; }
+
+    .save-note {
+      font-size: 12px;
+      color: var(--pm-active);
+      padding: 9px 12px;
+      background: var(--pm-active-light);
+      border: 1px solid color-mix(in srgb, var(--pm-active) 30%, transparent);
+      border-radius: var(--square-border);
+    }
+
+    /* ── PERIODIC COST ──────────────────────────────────────────────────── */
+    .periodic-panel {
+      border: 1px solid var(--pm-line);
+      border-radius: var(--square-border);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: var(--pm-bright);
+    }
+
+    .periodic-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .trip-stepper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stepper-btn {
+      width: 28px; height: 28px;
+      border: 1px solid var(--pm-line);
+      border-radius: 999px;
+      background: var(--pm-absolute);
+      color: var(--pm-text);
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-sans);
+      transition: background var(--motion-fast) var(--ease-standard),
+                  transform  var(--motion-base) var(--ease-standard);
+    }
+    .stepper-btn:hover  { background: var(--pm-bright); border-color: var(--pm-gray); }
+    .stepper-btn:active { transform: scale(0.88); transition-duration: 60ms; }
+    .stepper-btn:not(:active) { transition-timing-function: var(--ease-spring); }
+
+    .stepper-val {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      min-width: 24px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stepper-label {
+      font-size: 12px;
+      color: var(--pm-gray-dark);
+    }
+
+    .periodic-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .period-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .period-header {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--pm-gray-dark);
+    }
+
+    .period-new {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--pm-text);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum';
+    }
+
+    .period-diff {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--pm-red);
+      letter-spacing: -0.005em;
+      font-variant-numeric: tabular-nums;
+    }
+    .period-old  {
+      font-size: 11.5px;
+      color: var(--pm-gray);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cap-notice {
+      display: none;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 11.5px;
+      color: var(--pm-gray-dark);
+      line-height: 1.45;
+      padding-top: 10px;
+      border-top: 1px solid var(--pm-line);
+    }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+    @media (max-width: 440px) {
+      .w-header h1    { font-size: 16.5px; }
+      .opts-row       { grid-template-columns: 1fr; }
+      .price-grid     { gap: 8px; }
+      .pc-amount      { font-size: 26px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 1ms !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="widget">
+
+  <!-- HEADER -->
+  <div class="w-header">
+    <div class="w-eyebrow">Bypakke Grenland · Fra 11. mai 2026</div>
+    <h1>Hva koster bomringen deg?</h1>
+    <p>Skriv inn ruten din og se nye priser – inkludert hva elbilister nå må betale</p>
+  </div>
+
+  <!-- INPUTS -->
+  <div class="w-body">
+
+    <div class="field">
+      <label>Fra</label>
+      <div class="addr-wrap">
+        <input id="from-inp" class="meta-input" type="text"
+               placeholder="F.eks. Storgata 1, Skien"
+               autocomplete="off" spellcheck="false">
+        <ul class="suggestions" id="from-sug"></ul>
+      </div>
+    </div>
+
+    <div class="route-connector">via</div>
+
+    <div class="field">
+      <label>Til</label>
+      <div class="addr-wrap">
+        <input id="to-inp" class="meta-input" type="text"
+               placeholder="F.eks. Porsgrunn stasjon"
+               autocomplete="off" spellcheck="false">
+        <ul class="suggestions" id="to-sug"></ul>
+      </div>
+    </div>
+
+    <div class="opts-row">
+      <div class="field">
+        <label>Kjøretøy</label>
+        <select id="vehicle" class="meta-select">
+          <option value="light">Bensin / diesel</option>
+          <option value="ev">Elbil / nullutslipp</option>
+          <option value="heavy">Tung (&gt;3500 kg)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Avgangstid</label>
+        <input id="dep-time" class="meta-input" type="time" value="08:00">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Innstillinger</label>
+      <div class="toggle-row">
+        <button class="meta-toggle-pill is-on" id="tog-weekday" onclick="togglePill(this, 'weekday')">
+          Hverdag
+        </button>
+        <button class="meta-toggle-pill is-on" id="tog-roundtrip" onclick="togglePill(this, 'roundTrip')">
+          Tur / retur
+        </button>
+        <button class="meta-toggle-pill" id="tog-autopass" onclick="togglePill(this, 'autopass')">
+          AutoPASS-rabatt
+        </button>
+      </div>
+    </div>
+
+    <button class="btn-calc" id="btn-calc" onclick="calculate()">
+      Beregn bompenger
+    </button>
+
+    <div class="error-box" id="error-box"></div>
+    <div class="loading"   id="loading">Laster…</div>
+
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- RESULTS -->
+  <div class="w-results" id="results">
+
+    <div class="section-eyebrow">Prissammenligning</div>
+
+    <div class="price-grid">
+      <div class="price-card">
+        <div class="pc-eyebrow">Før 11. mai</div>
+        <div class="pc-amount" id="old-amt">–</div>
+        <div class="pc-sub"    id="old-sub"></div>
+      </div>
+      <div class="price-card is-new">
+        <div class="pc-eyebrow">Fra 11. mai</div>
+        <div class="pc-amount" id="new-amt">–</div>
+        <div class="pc-sub"    id="new-sub"></div>
+      </div>
+    </div>
+
+    <div class="time-row" id="time-row" style="display:none">
+      <div class="time-cell" id="tc-normal">
+        <span class="tc-now-badge">Ditt tidspunkt</span>
+        <span class="tc-head">Normaltid</span>
+        <span class="tc-hours">Alle tider utenom rushtid</span>
+        <span class="tc-price" id="tc-normal-price">–</span>
+      </div>
+      <div class="time-cell" id="tc-rush">
+        <span class="tc-now-badge">Ditt tidspunkt</span>
+        <span class="tc-head">Rushtid</span>
+        <span class="tc-hours">07–09 · 15–17 (hverdager)</span>
+        <span class="tc-price" id="tc-rush-price">–</span>
+      </div>
+    </div>
+
+    <div class="save-note" id="save-note" style="display:none"></div>
+
+    <div class="diff-banner" id="diff-banner">
+      <span class="diff-icon" id="diff-icon"></span>
+      <span class="diff-text" id="diff-text"></span>
+    </div>
+
+    <div class="section-eyebrow" id="station-heading">Bomstasjoner på ruten</div>
+    <ul class="station-list" id="station-list"></ul>
+
+    <div class="section-eyebrow">Kostnad over tid</div>
+    <div class="periodic-panel">
+      <div class="periodic-controls">
+        <div class="trip-stepper">
+          <button class="stepper-btn" onclick="adjustDays(-1)">–</button>
+          <span class="stepper-val" id="days-val">5</span>
+          <button class="stepper-btn" onclick="adjustDays(1)">+</button>
+          <span class="stepper-label">dager / uke</span>
+        </div>
+      </div>
+
+      <div class="periodic-stats">
+        <div class="period-col">
+          <div class="period-header">Per måned</div>
+          <div class="period-new"  id="monthly-new">–</div>
+          <div class="period-diff" id="monthly-diff"></div>
+          <div class="period-old"  id="monthly-old"></div>
+        </div>
+        <div class="period-col">
+          <div class="period-header">Per år</div>
+          <div class="period-new"  id="yearly-new">–</div>
+          <div class="period-diff" id="yearly-diff"></div>
+          <div class="period-old"  id="yearly-old"></div>
+        </div>
+      </div>
+
+      <div class="cap-notice" id="cap-notice">
+        <span>ℹ️</span>
+        <span id="cap-text"></span>
+      </div>
+    </div>
+
+    <div class="w-footnote">
+      <strong>Timesregelen:</strong> én betalende passering per time, uavhengig av antall bommer.
+      AutoPASS-avtale gir 20&nbsp;% rabatt. Elbiler betaler 70&nbsp;% av normaltakst.
+      Månedlig tak: 60 passeringer. Bomstasjonene krever kun i én retning — gule prikker viser bommer du belastes for på tilbakeveien.
+      Beregningen er veiledende. Bomdata: <a href="https://bypakka.no/bompenger/" target="_blank">bypakka.no</a> ·
+      Kart: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" target="_blank">CARTO</a> · Ruting: OSRM.
+    </div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// TOGGLE STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const state = { weekday: true, autopass: false, roundTrip: true };
+let lastResult  = null;   // alt som trengs for re-render uten ny rute-fetch
+let daysPerWeek = 5;
+
+function togglePill(btn, key) {
+  state[key] = !state[key];
+  btn.classList.toggle('is-on', state[key]);
+  if (lastResult && (key === 'roundTrip' || key === 'autopass' || key === 'weekday')) {
+    renderResults();
+    updatePeriodic();
+  }
+}
+
+function adjustDays(delta) {
+  daysPerWeek = Math.max(1, Math.min(7, daysPerWeek + delta));
+  document.getElementById('days-val').textContent = daysPerWeek;
+  updatePeriodic();
+}
+
+function fmtNok(n) {
+  return Math.round(n).toLocaleString('nb-NO') + ' kr';
+}
+
+function updatePeriodic() {
+  if (!lastResult) return;
+  const { n, nReturn, newUnit, oldUnit } = lastResult;
+
+  const stationsPerDay   = n + (state.roundTrip ? nReturn : 0);
+  const stationsPerWeek  = daysPerWeek * stationsPerDay;
+  const monthlyPassages  = Math.round(stationsPerWeek * 52 / 12);
+  const paidMonthly      = Math.min(monthlyPassages, 60);
+
+  const mnNew  = paidMonthly * newUnit;
+  const mnOld  = paidMonthly * oldUnit;   // oldUnit = 0 for EV
+  const yrNew  = mnNew * 12;
+  const yrOld  = mnOld * 12;
+  const mnDiff = mnNew - mnOld;
+  const yrDiff = yrNew - yrOld;
+
+  document.getElementById('monthly-new').textContent  = fmtNok(mnNew);
+  document.getElementById('yearly-new').textContent   = fmtNok(yrNew);
+
+  if (oldUnit === 0) {
+    document.getElementById('monthly-old').textContent  = 'Var: gratis';
+    document.getElementById('yearly-old').textContent   = 'Var: gratis';
+    document.getElementById('monthly-diff').textContent = '+' + fmtNok(mnNew) + '/mnd';
+    document.getElementById('yearly-diff').textContent  = '+' + fmtNok(yrNew) + '/år';
+  } else {
+    document.getElementById('monthly-old').textContent  = 'Var: ' + fmtNok(mnOld);
+    document.getElementById('yearly-old').textContent   = 'Var: ' + fmtNok(yrOld);
+    document.getElementById('monthly-diff').textContent = (mnDiff >= 0 ? '+' : '') + fmtNok(mnDiff) + '/mnd';
+    document.getElementById('yearly-diff').textContent  = (yrDiff >= 0 ? '+' : '') + fmtNok(yrDiff) + '/år';
+  }
+
+  const capNotice = document.getElementById('cap-notice');
+  if (monthlyPassages > 60) {
+    const free = monthlyPassages - 60;
+    document.getElementById('cap-text').textContent =
+      `Månedstaket på 60 pass. nås (${monthlyPassages} pass./mnd.) — ${free} pass. er gratis.`;
+    capNotice.style.display = 'flex';
+  } else {
+    capNotice.style.display = 'none';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOLL STATION DATA  (coordinates are approximate)
+// ─────────────────────────────────────────────────────────────────────────────
+// Koordinater og innkrevingsretning hentet fra bypakka.no/bompenger/
+const STATIONS = [
+  { name:'Hesselberg gate',  road:'Fv 357', city:'Skien',     lat:59.20449569558046,  lng:9.587562624801649,  dir:'east'  },
+  { name:'Klostergata',      road:'Fv 59',  city:'Skien',     lat:59.19811850738246,  lng:9.610605771384257,  dir:'north' },
+  { name:'Elstrømbrua',      road:'Fv 357', city:'Skien',     lat:59.19627820605406,  lng:9.584376980006141,  dir:'north' },
+  { name:'Menstadbrua',      road:'Fv 32',  city:'Skien',     lat:59.17416611026802,  lng:9.633013649604209,  dir:'east'  },
+  { name:'Bjørntvedtvegen',  road:'Fv 48',  city:'Skien',     lat:59.16233706653852,  lng:9.604909470881694,  dir:'north' },
+  { name:'Borgestadalléen',  road:'Fv 32',  city:'Skien',     lat:59.16096101349852,  lng:9.652264089965797,  dir:'north' },
+  { name:'Lensmannsdalen',   road:'Rv 36',  city:'Skien',     lat:59.159181289754876, lng:9.635550580117751,  dir:'north' },
+  { name:'Borgestad kirke',  road:'Håvundvegen', city:'Porsgrunn', lat:59.15886740292489,  lng:9.65858253809813,   dir:'north' },
+  { name:'Sannivegen',       road:'Fv 34',  city:'Porsgrunn', lat:59.15812546496598,  lng:9.688438773016287,  dir:'north' },
+  { name:'Vallermyrene',     road:'Fv 32',  city:'Porsgrunn', lat:59.13134486264651,  lng:9.681914082586673,  dir:'north' },
+  { name:'Herøyavegen',      road:'Rv 36',  city:'Porsgrunn', lat:59.12193865360947,  lng:9.649205957641584,  dir:'north' },
+  { name:'Deichmanns gate',  road:'',       city:'Porsgrunn', lat:59.11995003008575,  lng:9.663719093978898,  dir:'north' },
+  { name:'Fjordgata',        road:'',       city:'Porsgrunn', lat:59.11349820837259,  lng:9.642776028805542,  dir:'north' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRICING
+// ─────────────────────────────────────────────────────────────────────────────
+const PRICE = {
+  old: {
+    light: { n:17,   r:23   },
+    ev:    { n:0,    r:0    },   // was free
+    heavy: { n:27,   r:38   },
+  },
+  new: {
+    light: { n:21,   r:29   },
+    ev:    { n:14.7, r:20.3 },  // 70% of light; ×0.8 with AutoPASS ≈ 11.8/16.2
+    heavy: { n:43,   r:58   },
+  },
+};
+
+function isRush(t, weekday) {
+  if (!weekday) return false;
+  const [h, m] = t.split(':').map(Number);
+  const min = h * 60 + m;
+  return (min >= 420 && min < 540) || (min >= 900 && min < 1020);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAP
+// ─────────────────────────────────────────────────────────────────────────────
+let map, tileLayer, routeLine, startMark, endMark;
+const sCircles = [];
+
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => darkQuery.matches;
+
+function mapColors() {
+  const d = isDark();
+  return {
+    line:     d ? '#B8F2FF' : '#004F58',
+    hit:      d ? { fill: '#5E044C', stroke: '#FFCFF0' } : { fill: '#FFCFF0', stroke: '#5E044C' },
+    return:   d ? { fill: '#574500', stroke: '#FAF6C1' } : { fill: '#FAF6C1', stroke: '#574500' },
+    inactive: d ? { fill: '#3a3836', stroke: '#777' }    : { fill: '#cccccc', stroke: '#888' },
+    tileUrl:  d
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  };
+}
+
+function initMap() {
+  if (map) return;
+  document.getElementById('map').style.display = 'block';
+
+  map = L.map('map', { scrollWheelZoom: true }).setView([59.175, 9.61], 11);
+  tileLayer = L.tileLayer(mapColors().tileUrl, {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  const c0 = mapColors();
+  STATIONS.forEach(s => {
+    const c = L.circleMarker([s.lat, s.lng], {
+      radius: 6,
+      color: c0.inactive.stroke,
+      weight: 1.5,
+      fillColor: c0.inactive.fill,
+      fillOpacity: 0.75,
+    }).addTo(map)
+      .bindPopup(`<b style="font-family:Inter,sans-serif">${s.name}</b><br><small>${[s.road, s.city].filter(Boolean).join(', ')}</small>`);
+    sCircles.push(c);
+  });
+}
+
+darkQuery.addEventListener('change', () => {
+  if (map && tileLayer) {
+    map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(mapColors().tileUrl, {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+  }
+  if (routeLine) routeLine.setStyle({ color: mapColors().line });
+  if (lastResult) renderResults();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GEOCODING
+// ─────────────────────────────────────────────────────────────────────────────
+let fromCoord = null, toCoord = null;
+const timers = {};
+
+async function nominatim(q) {
+  const p = new URLSearchParams({ q, format:'json', limit:'5', countrycodes:'no', viewbox:'9.30,59.05,9.95,59.38', bounded:'0' });
+  return (await fetch(`https://nominatim.openstreetmap.org/search?${p}`)).json();
+}
+
+function shortLabel(dn) { return dn.split(',').slice(0, 4).join(', ').trim(); }
+
+function setupAC(inpId, sugId, onPick) {
+  const inp = document.getElementById(inpId);
+  const sug = document.getElementById(sugId);
+  let activeIdx = -1;
+
+  const items = () => Array.from(sug.querySelectorAll('li'));
+
+  function setActive(i) {
+    const els = items();
+    if (!els.length) { activeIdx = -1; return; }
+    activeIdx = (i + els.length) % els.length;
+    els.forEach((el, idx) => el.classList.toggle('is-active', idx === activeIdx));
+    els[activeIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  function close() {
+    sug.innerHTML = '';
+    sug.style.display = 'none';
+    activeIdx = -1;
+  }
+
+  inp.addEventListener('input', () => {
+    if (inpId === 'from-inp') fromCoord = null; else toCoord = null;
+    clearTimeout(timers[inpId]);
+    const v = inp.value.trim();
+    if (v.length < 3) { close(); return; }
+    timers[inpId] = setTimeout(async () => {
+      try {
+        const rs = await nominatim(v);
+        sug.innerHTML = '';
+        activeIdx = -1;
+        if (!rs.length) { sug.style.display = 'none'; return; }
+        rs.forEach(r => {
+          const li = document.createElement('li');
+          li.textContent = shortLabel(r.display_name);
+          li.addEventListener('mouseenter', () => setActive(items().indexOf(li)));
+          li.onclick = () => {
+            inp.value = li.textContent;
+            close();
+            onPick({ lat: +r.lat, lng: +r.lon });
+          };
+          sug.appendChild(li);
+        });
+        sug.style.display = 'block';
+      } catch {}
+    }, 380);
+  });
+
+  inp.addEventListener('keydown', (e) => {
+    if (sug.style.display !== 'block') return;
+    const els = items();
+    if (!els.length) return;
+    if (e.key === 'ArrowDown')      { e.preventDefault(); setActive(activeIdx + 1); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(activeIdx - 1); }
+    else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); els[activeIdx].click(); }
+    else if (e.key === 'Escape')    { close(); }
+  });
+
+  document.addEventListener('click', e => {
+    if (!inp.contains(e.target) && !sug.contains(e.target)) close();
+  });
+}
+
+setupAC('from-inp', 'from-sug', c => { fromCoord = c; });
+setupAC('to-inp',   'to-sug',   c => { toCoord   = c; });
+
+// Live re-render når kjøretøy/tid endres (ingen ny OSRM-fetch nødvendig)
+function reRender(field, value) {
+  if (!lastResult) return;
+  lastResult[field] = value;
+  renderResults();
+  updatePeriodic();
+}
+document.getElementById('vehicle').addEventListener('change', e => reRender('vehicle', e.target.value));
+document.getElementById('dep-time').addEventListener('change', e => reRender('time', e.target.value));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROUTING
+// ─────────────────────────────────────────────────────────────────────────────
+async function getRoute(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const d = await (await fetch(url)).json();
+  if (d.code !== 'Ok') throw new Error('Ingen rute');
+  return d.routes[0].geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GEOMETRY
+// ─────────────────────────────────────────────────────────────────────────────
+function haverDist(la1, lo1, la2, lo2) {
+  const R = 6371000, r = Math.PI / 180;
+  const dl = (la2-la1)*r, dg = (lo2-lo1)*r;
+  return R * 2 * Math.atan2(
+    Math.sqrt(Math.sin(dl/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dg/2)**2),
+    Math.sqrt(1 - (Math.sin(dl/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dg/2)**2))
+  );
+}
+
+function brng(la1, lo1, la2, lo2) {
+  const r = Math.PI/180, dg = (lo2-lo1)*r;
+  return (Math.atan2(Math.sin(dg)*Math.cos(la2*r),
+    Math.cos(la1*r)*Math.sin(la2*r) - Math.sin(la1*r)*Math.cos(la2*r)*Math.cos(dg)
+  ) * 180 / Math.PI + 360) % 360;
+}
+
+const DIRBR = { north:0, east:90, south:180, west:270 };
+
+function angleDiff(a, b) {
+  return Math.abs(((a - b) % 360 + 540) % 360 - 180);
+}
+
+const STATION_RADIUS_M = 60;    // perpendikulær avstand fra rutesegment til bom
+const ANGLE_TOL_DEG    = 60;    // hvor nær stasjonens innkrevingsretning rutens bearing må være
+
+// Perpendikulær avstand i meter fra punkt s til linjesegment a–b (planar approks. for korte segmenter)
+function distToSegmentM(s, a, b) {
+  const lat0   = (a.lat + b.lat) / 2;
+  const mPerLat = 111320;
+  const mPerLng = 111320 * Math.cos(lat0 * Math.PI / 180);
+  const bx = (b.lng - a.lng) * mPerLng, by = (b.lat - a.lat) * mPerLat;
+  const px = (s.lng - a.lng) * mPerLng, py = (s.lat - a.lat) * mPerLat;
+  const lenSq = bx*bx + by*by;
+  if (lenSq === 0) return Math.hypot(px, py);
+  let t = (px*bx + py*by) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - t*bx, py - t*by);
+}
+
+function detectStations(pts) {
+  const outbound = [];
+  const returnOnly = [];
+  for (const s of STATIONS) {
+    let minD = Infinity, bestSeg = -1;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const d = distToSegmentM(s, pts[i], pts[i+1]);
+      if (d < minD) { minD = d; bestSeg = i; }
+    }
+    if (minD > STATION_RADIUS_M || bestSeg < 0) continue;
+
+    const a = pts[bestSeg];
+    const b = pts[bestSeg + 1];
+    const routeBrng = brng(a.lat, a.lng, b.lat, b.lng);
+    const target    = DIRBR[s.dir] ?? 0;
+
+    if (angleDiff(routeBrng, target) <= ANGLE_TOL_DEG)                   outbound.push(s);
+    else if (angleDiff(routeBrng, (target + 180) % 360) <= ANGLE_TOL_DEG) returnOnly.push(s);
+    // ellers: nær ruten men retningen passer ikke (perpendikulær kryssing) → ignorer
+  }
+  return { outbound, returnOnly };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMAT
+// ─────────────────────────────────────────────────────────────────────────────
+const fmt = n => n === 0 ? '0' : Number.isInteger(n) ? `${n}` : n.toFixed(1);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRICING HELPERS + RENDER
+// ─────────────────────────────────────────────────────────────────────────────
+function unitFor(vehicle, key, old) {
+  const apF = state.autopass ? 0.8 : 1;
+  const base = old
+    ? (vehicle === 'ev' ? 0 : PRICE.old[vehicle][key])
+    : PRICE.new[vehicle][key];
+  return base * apF;
+}
+
+function renderResults() {
+  if (!lastResult) return;
+  const { hit, hitReturn, n, nReturn, vehicle, time } = lastResult;
+  const rush  = isRush(time, state.weekday);
+  const key   = rush ? 'r' : 'n';
+
+  const oldUnit = unitFor(vehicle, key, true);
+  const newUnit = unitFor(vehicle, key, false);
+
+  const stations  = n + (state.roundTrip ? nReturn : 0);
+  const oldTotal  = oldUnit * stations;
+  const newTotal  = newUnit * stations;
+
+  // ── Price cards ──
+  const oldAmEl = document.getElementById('old-amt');
+  const newAmEl = document.getElementById('new-amt');
+
+  if (vehicle === 'ev' && stations > 0) {
+    oldAmEl.innerHTML = '<span style="font-size:20px;color:var(--pm-text);font-weight:700;letter-spacing:-0.01em">Gratis</span>';
+  } else {
+    oldAmEl.innerHTML = `${fmt(oldTotal)}&thinsp;<span class="pc-unit">kr</span>`;
+  }
+  newAmEl.innerHTML = `${fmt(newTotal)}&thinsp;<span class="pc-unit">kr</span>`;
+
+  const rushLbl = rush ? 'rushtid' : 'normaltid';
+  const apLbl   = state.autopass ? ' m/AutoPASS' : '';
+  const trLbl   = state.roundTrip && nReturn > 0 ? ' · tur/retur' : '';
+  const bomLbl  = state.roundTrip && nReturn > 0
+    ? `${n} tur + ${nReturn} retur`
+    : (stations === 1 ? '1 bom' : `${stations} bommer`);
+
+  document.getElementById('old-sub').textContent = stations > 0
+    ? `${bomLbl} × ${fmt(oldUnit)} kr${apLbl} · ${rushLbl}${trLbl}`
+    : 'Ingen bommer på ruten';
+  document.getElementById('new-sub').textContent = stations > 0
+    ? `${bomLbl} × ${fmt(newUnit)} kr${apLbl} · ${rushLbl}${trLbl}`
+    : 'Ingen bommer på ruten';
+
+  // ── Diff banner ──
+  const banner   = document.getElementById('diff-banner');
+  const diffIcon = document.getElementById('diff-icon');
+  const diffText = document.getElementById('diff-text');
+  banner.className = 'diff-banner';
+
+  if (stations === 0) {
+    banner.classList.add('is-info');
+    diffText.innerHTML = nReturn > 0
+      ? 'Ingen bommer på utveien. Skru på <strong>Tur / retur</strong> for å se kostnaden tilbake.'
+      : 'Ruten passerer ingen bomstasjoner – du betaler ingenting.';
+  } else if (vehicle === 'ev') {
+    banner.classList.add('is-ev-new');
+    diffText.innerHTML =
+      `Elbiler betalte <strong>ingenting</strong> i Grenland-bomringen. ` +
+      `Fra 11. mai koster ${state.roundTrip && nReturn > 0 ? 'tur/retur' : 'denne turen'} ` +
+      `<strong>${fmt(newTotal)}&nbsp;kr</strong>${state.autopass ? ' (med AutoPASS-rabatt)' : ''} i ${rushLbl}.`;
+  } else {
+    const diff = newTotal - oldTotal;
+    if (diff > 0) {
+      banner.classList.add('is-increase');
+      diffText.innerHTML =
+        `Prisen øker med <strong>${fmt(diff)}&nbsp;kr</strong> fra 11. mai ` +
+        `(fra ${fmt(oldTotal)}&nbsp;kr til ${fmt(newTotal)}&nbsp;kr).`;
+    } else {
+      banner.classList.add('is-neutral');
+      diffText.textContent = 'Prisen er uendret for denne turen.';
+    }
+  }
+
+  // ── Station list ──
+  document.getElementById('station-heading').textContent =
+    nReturn > 0
+      ? `Bomstasjoner på ruten (${n} tur · ${nReturn} retur)`
+      : `Bomstasjoner på ruten (${n})`;
+
+  const listEl = document.getElementById('station-list');
+  listEl.innerHTML = '';
+
+  if (n === 0 && nReturn === 0) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="s-dot miss"></span><span class="s-name" style="color:var(--pm-gray)">Ingen bomstasjoner passeres</span>';
+    listEl.appendChild(li);
+  } else {
+    hit.forEach(s => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        `<span class="s-dot hit"></span>` +
+        `<span class="s-name">${s.name}</span>` +
+        `<span class="s-road">${[s.road, s.city].filter(Boolean).join(' · ')}</span>`;
+      listEl.appendChild(li);
+    });
+    hitReturn.forEach(s => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        `<span class="s-dot return"></span>` +
+        `<span class="s-name">${s.name} <span class="s-return-badge">retur</span></span>` +
+        `<span class="s-road">${[s.road, s.city].filter(Boolean).join(' · ')}</span>`;
+      listEl.appendChild(li);
+    });
+  }
+
+  // ── Map markers (Varden palette, lys/mørk-bevisst) ──
+  const mc = mapColors();
+  STATIONS.forEach((s, i) => {
+    const isOut = hit.includes(s);
+    const isRet = hitReturn.includes(s);
+    const c = isOut ? mc.hit : isRet ? mc.return : mc.inactive;
+    sCircles[i].setStyle({
+      radius:      isOut ? 9 : isRet ? 8 : 5,
+      fillColor:   c.fill,
+      color:       c.stroke,
+      fillOpacity: isOut ? 1.0 : isRet ? 0.9 : 0.35,
+      weight:      (isOut || isRet) ? 2 : 1,
+    });
+  });
+
+  // ── Time comparison ──
+  if (stations > 0) {
+    const normalUnit  = unitFor(vehicle, 'n', false);
+    const rushUnit    = unitFor(vehicle, 'r', false);
+    const normalTotal = normalUnit * stations;
+    const rushTotal   = rushUnit   * stations;
+    const saving      = rushTotal - normalTotal;
+
+    document.getElementById('tc-normal-price').innerHTML =
+      `${fmt(normalTotal)}&thinsp;<span class="tc-unit">kr</span>`;
+    document.getElementById('tc-rush-price').innerHTML =
+      `${fmt(rushTotal)}&thinsp;<span class="tc-unit">kr</span>`;
+
+    document.getElementById('tc-normal').classList.toggle('is-now', !rush);
+    document.getElementById('tc-rush').classList.toggle('is-now',  rush);
+    document.getElementById('time-row').style.display = 'flex';
+
+    const tripWord = state.roundTrip && nReturn > 0 ? 'per tur/retur' : 'per tur';
+    const saveEl = document.getElementById('save-note');
+    if (saving > 0) {
+      saveEl.innerHTML = rush
+        ? `<strong>Tips:</strong> du sparer <strong>${fmt(saving)}&nbsp;kr</strong> ${tripWord} ved å reise utenom rushtid (kl.&nbsp;09–15 eller etter&nbsp;17).`
+        : `<strong>Tips:</strong> du er utenom rushtid. Reiser du mellom 07–09 eller 15–17 på hverdager, koster turen <strong>${fmt(saving)}&nbsp;kr</strong> mer.`;
+      saveEl.style.display = 'block';
+    } else {
+      saveEl.style.display = 'none';
+    }
+  } else {
+    document.getElementById('time-row').style.display = 'none';
+    document.getElementById('save-note').style.display = 'none';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CALCULATE
+// ─────────────────────────────────────────────────────────────────────────────
+async function calculate() {
+  const errEl  = document.getElementById('error-box');
+  const loadEl = document.getElementById('loading');
+  const btn    = document.getElementById('btn-calc');
+  errEl.style.display = 'none';
+
+  const fromTxt = document.getElementById('from-inp').value.trim();
+  const toTxt   = document.getElementById('to-inp').value.trim();
+  const vehicle = document.getElementById('vehicle').value;
+  const time    = document.getElementById('dep-time').value;
+
+  let from = fromCoord, to = toCoord;
+  try {
+    if (!from && fromTxt.length >= 3) { const r = await nominatim(fromTxt); if (r.length) from = fromCoord = { lat:+r[0].lat, lng:+r[0].lon }; }
+    if (!to   && toTxt.length >= 3)   { const r = await nominatim(toTxt);   if (r.length) to   = toCoord   = { lat:+r[0].lat, lng:+r[0].lon }; }
+  } catch {}
+
+  if (!from || !to) {
+    errEl.textContent = 'Fyll inn gyldige adresser for start og destinasjon.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  loadEl.style.display = 'block';
+
+  try {
+    const pts = await getRoute(from, to);
+
+    initMap();
+    if (routeLine)  map.removeLayer(routeLine);
+    if (startMark)  map.removeLayer(startMark);
+    if (endMark)    map.removeLayer(endMark);
+
+    routeLine = L.polyline(pts.map(p => [p.lat, p.lng]), {
+      color: mapColors().line, weight: 4, opacity: 0.9
+    }).addTo(map);
+    startMark = L.marker([from.lat, from.lng]).addTo(map).bindPopup('Start: ' + fromTxt);
+    endMark   = L.marker([to.lat,   to.lng  ]).addTo(map).bindPopup('Mål: '   + toTxt);
+    map.fitBounds(routeLine.getBounds(), { padding: [45, 45] });
+
+    const { outbound: hit, returnOnly: hitReturn } = detectStations(pts);
+
+    // Snapshot route-avhengig data — render-funksjonen leser dette + live state
+    lastResult = {
+      hit, hitReturn,
+      n: hit.length,
+      nReturn: hitReturn.length,
+      vehicle, time,
+      // Beregnes på nytt i renderResults via state, men brukt av updatePeriodic
+      get newUnit() { return unitFor(this.vehicle, isRush(this.time, state.weekday) ? 'r' : 'n', false); },
+      get oldUnit() { return unitFor(this.vehicle, isRush(this.time, state.weekday) ? 'r' : 'n', true); },
+    };
+
+    renderResults();
+    updatePeriodic();
+
+    const resultsEl = document.getElementById('results');
+    resultsEl.style.display = 'flex';
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  } catch (err) {
+    errEl.textContent = 'Kunne ikke beregne ruten. Sjekk adressene og prøv igjen.';
+    errEl.style.display = 'block';
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    loadEl.style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>
