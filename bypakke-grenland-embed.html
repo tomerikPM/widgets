@@ -1,21 +1,4 @@
-<!--
-  Bypakke Grenland — bompengekalkulator. Polaris Nivå 3-widget.
-  Rot-container: #pm-widget-bompenger-grenland — all CSS scoped, ingen leakage.
-
-  Ingen Nivå 3-brudd som kan løses uten dispensasjon:
-    ✓ Rot-container med scoped CSS
-    ✓ Ingen Inter-font fra rsms.me (system stack i stedet)
-    ✓ Vanilla JS, ingen npm/build-steg
-    ✓ Ingen API-nøkler, ingen ekstern datainnsamling utover under
-
-  Brudd som krever dispensasjon fra PM Produkt:
-    ⚠ Leaflet 1.9.4 fra unpkg.com (CDN — JS/CSS-bibliotek)
-    ⚠ Kartfliser fra basemaps.cartocdn.com (CARTO + OpenStreetMap)
-    ⚠ Adresse-geokoding via nominatim.openstreetmap.org
-    ⚠ Ruteberegning via router.project-osrm.org
-  Begrunnelse: Kjernen i widgeten er adresse→adresse-ruting med kart-visning.
-  Kan ikke leveres uten ekstern flise-, geokodings- og rutings-tjeneste.
--->
+<div id="pm-widget-bompenger-grenland" class="widget">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
@@ -1012,8 +995,6 @@
   
   </style>
 
-<div id="pm-widget-bompenger-grenland" class="widget">
-
   <!-- HEADER -->
   <div class="w-header">
     <div class="w-eyebrow">Bypakke Grenland · Fra 11. mai 2026</div>
@@ -1252,7 +1233,6 @@
 
   <!-- BYLINE (alltid synlig, utenfor .w-results) -->
   <div class="w-byline">Utvikling: Tom Erik Thorsen</div>
-</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -2149,3 +2129,4 @@ async function calculate() {
   }
 }
 </script>
+</div>
